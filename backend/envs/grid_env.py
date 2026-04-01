@@ -1,17 +1,17 @@
 import numpy as np
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, Tuple
 
 from gymnasium import Env
 from gymnasium.spaces import Dict as GymDict, Box, Discrete
 from gymnasium.utils import seeding
 
+from config import config
 from envs.house_env import HouseEnv
 from models.gnn_coordinator import GNNCoordinator
-from utils.graph_utils import build_grid_graph
 from utils.data_utils import load_weather_data
-from utils.reward_utils import compute_grid_reward
+from utils.graph_utils import build_grid_graph, create_grid_graph
 from utils.logging_utils import log_env_info
-from config import config
+from utils.reward_utils import compute_grid_reward
 
 
 class GridEnv(Env):
@@ -22,8 +22,8 @@ class GridEnv(Env):
 
     def __init__(
         self,
-        grid_topology_file: str = "data/grid_topology/sample_grid.json",
-        weather_file: str = "data/weather_data/sample_weather.csv",
+        grid_topology_file: str = "",
+        weather_file: str = "",
         num_households: int = config["num_households"],
         max_episode_steps: int = config["env"]["max_episode_steps"],
     ):
@@ -31,8 +31,10 @@ class GridEnv(Env):
         Initialize the main grid environment.
 
         Args:
-            grid_topology_file: Path to grid topology file (JSON).
-            weather_file: Path to weather data file (CSV).
+            grid_topology_file: Optional path to grid topology file (JSON).
+                If empty, uses an in-memory default graph topology.
+            weather_file: Optional path to weather data file (CSV).
+                If empty or missing, synthetic default weather is used.
             num_households: Number of households in the grid.
             max_episode_steps: Maximum number of timesteps per episode.
                 NOTE: sourced from canonical config["env"]["max_episode_steps"].
@@ -45,7 +47,10 @@ class GridEnv(Env):
         self.max_episode_steps = max_episode_steps
 
         # Load grid topology and build graph
-        self.graph = build_grid_graph(grid_topology_file, num_households)
+        if grid_topology_file:
+            self.graph = build_grid_graph(grid_topology_file, num_households)
+        else:
+            self.graph = create_grid_graph(num_households=num_households)
         self.nodes = list(self.graph.nodes)
         self.edges = list(self.graph.edges)
 
