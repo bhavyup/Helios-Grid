@@ -25,7 +25,7 @@ class GridEnv(Env):
         grid_topology_file: str = "data/grid_topology/sample_grid.json",
         weather_file: str = "data/weather_data/sample_weather.csv",
         num_households: int = config["num_households"],
-        max_episode_steps: int = config["training_steps"],
+        max_episode_steps: int = config["env"]["max_episode_steps"],
     ):
         """
         Initialize the main grid environment.
@@ -35,8 +35,7 @@ class GridEnv(Env):
             weather_file: Path to weather data file (CSV).
             num_households: Number of households in the grid.
             max_episode_steps: Maximum number of timesteps per episode.
-                NOTE: sourced from config["training_steps"] by default.
-                The config key name is preserved for backward compatibility.
+                NOTE: sourced from canonical config["env"]["max_episode_steps"].
         """
         super().__init__()
 

@@ -108,10 +108,10 @@ agents:
 
 training:
   episodes: 1000              # total training episodes
-  training_steps: 1000        # DEPRECATED: global training-update budget
-                              # The config loader maps this to env.max_episode_steps
-                              # when env.max_episode_steps is not present (backward compat)
-                              # CANONICAL key is env.max_episode_steps
+  training_steps: 1000        # CANONICAL: global training-update budget
+                              # (total optimizer/gradient updates across training)
+                              # Loader keeps deprecated alias "training_total_steps"
+                              # mapped to this key for backward compatibility.
   steps_per_episode: 24       # timesteps the orchestrator runs per
                               # episode in its own loop.
                               # NOTE: this is DISTINCT from
@@ -181,4 +181,7 @@ num_households: 10            # ←── keep in sync with env.num_households
 training_steps: 1000          # ←── DEPRECATED alias for env.max_episode_steps
                               # Config loader should derive env.max_episode_steps from this
                               # when env.max_episode_steps is absent (backward compatibility)
+training_total_steps: 1000    # ←── DEPRECATED alias for training.training_steps
+                              # Config loader derives this from training.training_steps
+                              # for backward compatibility with older top-level access.
 max_battery: 10               # ←── keep in sync with env.max_battery
