@@ -104,26 +104,22 @@ def build_grid_graph(
         from utils.graph_utils import build_grid_graph
         self.graph = build_grid_graph(grid_topology_file, num_households)
 
-    ASSUMPTION: ``grid_env.py`` passes a file path and a household
-    count.  Currently the file path is **ignored** and a default
-    star topology is generated.  When topology-file loading is
-    implemented, this function should parse the file and construct
-    the graph accordingly.
-
     Args:
-        topology_file: Path to grid topology JSON (currently unused).
+        topology_file: Path to grid topology JSON. If provided and non-empty,
+            raises NotImplementedError as file-based loading is not yet implemented.
         num_households: Number of household nodes.
 
     Returns:
         ``nx.Graph`` with integer node IDs.
+
+    Raises:
+        NotImplementedError: If topology_file is provided and non-empty.
     """
     if topology_file:
-        logger.info(
-            "build_grid_graph called with topology_file=%r — "
-            "file-based topology loading is not yet implemented. "
-            "Using default star topology with %d households.",
-            topology_file,
-            num_households,
+        raise NotImplementedError(
+            f"File-based topology loading is not yet implemented. "
+            f"Provided topology_file: {topology_file!r}. "
+            f"Use create_grid_graph() directly or pass an empty string."
         )
 
     return create_grid_graph(num_households=num_households)

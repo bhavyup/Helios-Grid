@@ -85,12 +85,11 @@ def load_grid_topology(
 
     Returns:
         Parsed dict.  Structure depends on the JSON schema.
-        Returns empty dict if file is missing.
+        Returns empty dict if file is missing or invalid.
 
     ASSUMPTION: the JSON structure is compatible with
     ``pd.read_json(orient="index")``.  If the topology is a
     node/edge list, this parser will need to be replaced.
-    Unverified — requires inspecting the actual JSON file.
     """
     if not os.path.exists(file_path):
         logger.warning(
@@ -99,7 +98,43 @@ def load_grid_topology(
         )
         return {}
 
-    return pd.read_json(file_path, orient="index").to_dict()
+    try:
+        # Read as DataFrame first to validate structure
+        df = pd.read_json(file_path, orient="index")
+        result = df.to_dict()
+
+        # Validate that result is a dict mapping node IDs to properties
+        if not isinstance(result, dict):
+            logger.error(
+                "Grid topology file %s did not produce a dict structure; got %s",
+                file_path, type(result)
+            )
+            raise ValueError(
+                f"Grid topology file {file_path} has unexpected structure: "
+                f"expected dict, got {type(result)}"
+            )
+
+        # Validate that values are dict-like (have node properties)
+        for node_id, props in result.items():
+            if not isinstance(props, dict):
+                logger.error(
+                    "Grid topology file %s has invalid node %s with non-dict properties: %s",
+                    file_path, node_id, type(props)
+                )
+                raise ValueError(
+                    f"Grid topology file {file_path} has invalid structure: "
+                    f"node {node_id} properties are {type(props)}, expected dict"
+                )
+
+        return result
+
+    except Exception as e:
+        logger.error(
+            "Failed to load grid topology from %s: %s",
+            file_path, e
+        )
+        # Return empty dict to allow simulation to continue with defaults
+        return {}
 
 
 # ===================================================================

@@ -126,18 +126,32 @@ class GNNCoordinator:
         # Ensure mapping to contiguous 0-indexed IDs is used
         sorted_nodes = [self.idx_to_node[i] for i in range(len(self.graph.nodes))]
 
-        node_type_ids = torch.tensor(
-            [
-                1.0
-                if node_types[node] == "household"
-                else 2.0
-                if node_types[node] == "solar"
-                else 3.0
-                for node in sorted_nodes
-            ],
+        # Explicit mapping for all node types including "grid"
+        type_encoding = {
+            "household": 1.0,
+            "solar": 2.0,
+            "wind": 3.0,
+            "grid": 4.0,
+            "unknown": 0.0,  # For truly unexpected types
+        }
+
+        node_type_ids = []
+        for node in sorted_nodes:
+            node_type = node_types[node]
+            if node_type not in type_encoding:
+                logger.warning(
+                    "Unexpected node type %r for node %s; using 'unknown' encoding",
+                    node_type, node
+                )
+                node_type_ids.append(type_encoding["unknown"])
+            else:
+                node_type_ids.append(type_encoding[node_type])
+
+        node_type_tensor = torch.tensor(
+            node_type_ids,
             dtype=torch.float32,
         ).unsqueeze(1).to(self.device)
-        return node_type_ids
+        return node_type_tensor
 
     # NOTE: _get_edge_features is currently unused by _build_model
     def _get_edge_features(self) -> torch.Tensor:

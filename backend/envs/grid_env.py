@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Dict, List, Tuple, Any
 
-from gym import Env
-from gym.spaces import Dict as GymDict, Box, Discrete
-from gym.utils import seeding
+from gymnasium import Env
+from gymnasium.spaces import Dict as GymDict, Box, Discrete
+from gymnasium.utils import seeding
 
 from envs.house_env import HouseEnv
 from models.gnn_coordinator import GNNCoordinator
@@ -162,8 +162,14 @@ class GridEnv(Env):
         # TODO: coordination_signals are computed but not yet consumed.
         #       Wire into house sub-envs or include in observation when the
         #       coordination protocol is defined.
+        # Use .iloc for positional row selection if weather_data is a DataFrame
+        weather_datum = (
+            self.weather_data.iloc[weather_idx]
+            if hasattr(self.weather_data, 'iloc')
+            else self.weather_data[weather_idx]
+        )
         coordination_signals = self.gnn_coordinator.compute_coordination_signals(
-            house_step_results, self.graph, self.weather_data[weather_idx]
+            house_step_results, self.graph, weather_datum
         )
 
         # Advance time *after* consuming the current weather datum
@@ -172,8 +178,19 @@ class GridEnv(Env):
         # --- reward -------------------------------------------------------
         market_reward = 0.0
         if market_actions == 1:
+            # Compute aggregate supply, demand, and price
+            # ASSUMPTION: house_step_results contain supply/demand info
+            # For now, use placeholder aggregation
+            total_supply = sum(
+                getattr(env, 'supply', 0.0) for env in self.house_environments
+            )
+            total_demand = sum(
+                getattr(env, 'demand', 0.0) for env in self.house_environments
+            )
+            # Price could come from market state or be computed
+            current_price = getattr(self, 'current_price', 0.3)
             market_reward = float(
-                compute_grid_reward(self.house_environments, self.graph)
+                compute_grid_reward(total_supply, total_demand, current_price)
             )
 
         step_reward = market_reward

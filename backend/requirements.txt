@@ -1,9 +1,9 @@
 numpy
 pandas
 torch
-gym
+gymnasium
 matplotlib
+seaborn
 scikit-learn
 tqdm
-infra
-logging_utils
+networkx

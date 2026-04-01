@@ -24,9 +24,9 @@ ASSUMPTIONS (unverified — require source files)
 import numpy as np
 from typing import Tuple
 
-from gym import Env
-from gym.spaces import Box, Discrete
-from gym.utils import seeding
+from gymnasium import Env
+from gymnasium.spaces import Box, Discrete
+from gymnasium.utils import seeding
 
 from utils.data_utils import load_market_data
 from utils.reward_utils import compute_market_reward
@@ -134,10 +134,11 @@ class MarketEnv(Env):
         Returns:
             (observation, reward, done, info)
         """
-        assert self.action_space.contains(action), (
-            f"Invalid action {action!r}; expected value in "
-            f"{{0, ..., {self.num_actions - 1}}}"
-        )
+        if not self.action_space.contains(action):
+            raise ValueError(
+                f"Invalid action {action!r}; expected value in "
+                f"{{0, ..., {self.num_actions - 1}}}"
+            )
 
         self.prev_price = self.energy_price
 

@@ -77,16 +77,31 @@ class HouseAgent:
         initial_energy: float = 100.0,
         max_consumption: float = 5.0,
         price_ceiling: float = 10.0,
-        log_dir: str = config.LOG_DIR,
+        log_dir: Optional[str] = None,
         comm_layer: Optional[Any] = None,
         seed: Optional[int] = None,
     ):
+        # Validate constructor arguments
+        if price_ceiling <= 0:
+            raise ValueError(
+                f"price_ceiling must be > 0, got {price_ceiling}"
+            )
+        if max_consumption < 0:
+            raise ValueError(
+                f"max_consumption must be >= 0, got {max_consumption}"
+            )
+        if initial_energy < 0:
+            raise ValueError(
+                f"initial_energy must be >= 0, got {initial_energy}"
+            )
+
         self.house_id = house_id
         self.initial_energy = initial_energy
         self.energy = initial_energy
         self.max_consumption = max_consumption
         self.price_ceiling = price_ceiling
-        self.log_dir = log_dir
+        # Lazy evaluation of config to avoid import-time access
+        self.log_dir = log_dir if log_dir is not None else config.LOG_DIR
         self.running: bool = False
 
         self.consumption_history: List[Tuple[int, float]] = []

@@ -39,7 +39,7 @@ class CommunicationLayer:
     _ACCEPT_TIMEOUT_S = 1.0       # seconds; allows listener to re-check self.running
     _THREAD_JOIN_TIMEOUT_S = 3.0  # seconds; bounded wait during stop()
 
-    def __init__(self, host: str = "localhost", port: int = 5000):
+    def __init__(self, host: str = "localhost", port: int = 5000, gnn_coordinator=None):
         self.host = host
         self.port = port
 
@@ -53,6 +53,8 @@ class CommunicationLayer:
         self.message_queue: queue.Queue = queue.Queue()
         self.running = False              # set True only by start()
         self._threads: list = []
+        # Store long-lived coordinator to preserve trained state
+        self._gnn_coordinator = gnn_coordinator
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -160,17 +162,22 @@ class CommunicationLayer:
             )
 
     def _send_to_gnn(self, message: Dict[str, Any]) -> None:
-        """Orchestration stub — instantiates a *new* GNNCoordinator and runs
-        training epochs.  Trained state is **discarded** when this returns.
+        """Orchestration stub — uses long-lived GNNCoordinator instance.
 
         WARNING: This is orchestration hidden inside a communication call.
         Should be extracted into a dedicated training service.
-
-        NOTE [unverified]: GNNCoordinator() constructor contract is assumed
-        zero-arg; GNNCoordinator.run(num_epochs=int) is assumed from original.
         """
-        gnn = GNNCoordinator()
-        gnn.run(num_epochs=message.get("epochs", 100))
+        if self._gnn_coordinator is None:
+            # Lazy instantiation requires graph; log error if not available
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(
+                "GNNCoordinator not available; cannot process GNN message. "
+                "Inject a coordinator instance when creating CommunicationLayer."
+            )
+            return
+
+        self._gnn_coordinator.run(num_epochs=message.get("epochs", 100))
         log_training_data(
             log_dir=config.LOG_DIR,
             episode=message.get("episode", 1),

@@ -1,265 +1,193 @@
 """
-CommunicationLayer — TCP socket-based message router.
+HouseEnv — Household-level environment for RL training.
 
 ARCHITECTURAL NOTE
 ==================
-This file defines infrastructure for inter-component message passing.
-It does NOT define a gym.Env subclass and MUST NOT occupy the
-``envs/house_env.py`` module slot.
+This environment represents a single household agent in the Helios-Grid
+system. It manages battery state, consumption, and production for one
+household.
 
-Recommended location: ``infra/communication.py`` or ``services/comm_layer.py``
+The environment is used by GridEnv to instantiate multiple household
+sub-environments.
 
-If this file currently lives at ``envs/house_env.py``, it will block
-``grid_env.py``, which expects::
-
-    from envs.house_env import HouseEnv
-
-This is a P0 import-crash blocker.  Move this file before running
-the simulation.
-
-ROADMAP NOTE
-============
-The Helios-Grid roadmap specifies that distributed communication
-infrastructure should NOT be built in Phase 1.  This module should
-be deferred until socket-based coordination is actually needed.
+IMPORT NOTE
+===========
+CommunicationLayer has been moved to infra/communication.py.
+Import it from there if needed:
+    from infra.communication import CommunicationLayer
 """
 
-import socket
-import threading
-import queue
 import logging
-from typing import Dict, Any
-from datetime import datetime
-
-# ASSUMPTION: import paths are aligned with the package layout used
-# by grid_env.py (``from utils.…``, ``from models.…``).
-# The *original* file used bare imports (``from logging_utils import …``),
-# which is inconsistent with the rest of the project.
-# Adjust to match your actual layout.
-from config import config
-from utils.logging_utils import log_simulation_data, log_training_data
-from models.gnn_coordinator import GNNCoordinator
+import numpy as np
+from typing import Any, Dict, Tuple
+from gymnasium import Env
+from gymnasium.spaces import Box, Discrete
+from gymnasium.utils import seeding
 
 logger = logging.getLogger(__name__)
 
 
-class CommunicationLayer:
+class HouseEnv(Env):
     """
-    TCP socket server with threaded connection acceptance and a
-    queue-based message router.
+    Gym-compatible household environment.
 
-    WARNING — research-validity risk
-        ``_send_to_gnn`` runs GNN training synchronously as a side effect
-        of message routing.  Training blocks the entire message queue,
-        uses no seed control, and is triggered implicitly.  Consider
-        extracting training into an explicit, auditable pipeline before
-        using this in experiments.
+    Action space:
+        Box(shape=(6,), dtype=np.float32)
+            [battery_charge, battery_discharge, consumption_adjust, ...]
+
+    Observation space:
+        Box(shape=(10,), dtype=np.float32)
+            [battery_level, consumption, production, price, ...]
     """
 
-    _ACCEPT_TIMEOUT_S: float = 1.0
-    _QUEUE_TIMEOUT_S: float = 0.5
+    metadata = {"render.modes": ["human"]}
 
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 5000,
-        gnn_coordinator: "GNNCoordinator | None" = None,
+        house_id: int = 0,
+        max_battery: float = 10.0,
+        initial_battery: float = 5.0,
     ):
         """
         Args:
-            host: Bind address for the TCP server.
-            port: Bind port for the TCP server.
-            gnn_coordinator: Optional pre-built coordinator.
-                If ``None``, one will be lazily created on the first
-                ``"gnn"`` message (ASSUMPTION: zero-arg constructor).
+            house_id: Unique identifier for this household.
+            max_battery: Battery capacity (kWh).
+            initial_battery: Initial battery charge (kWh).
         """
-        self.host = host
-        self.port = port
+        super().__init__()
+        self.house_id = house_id
+        self.max_battery = max_battery
+        self.initial_battery = initial_battery
 
-        # --- socket setup ------------------------------------------------
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.settimeout(self._ACCEPT_TIMEOUT_S)
-        self.sock.bind((self.host, self.port))
-        self.sock.listen(5)
+        # State variables
+        self.battery_level = initial_battery
+        self.consumption = 0.0
+        self.production = 0.0
+        self.supply = 0.0
+        self.demand = 0.0
+        self.current_price = 0.3
+        self.timestep = 0
 
-        # --- shared state ------------------------------------------------
-        self.clients: list[socket.socket] = []
-        self._clients_lock = threading.Lock()
-        self.message_queue: queue.Queue[Dict[str, Any]] = queue.Queue()
-        self.running: bool = False
-
-        # Reuse a single coordinator instead of creating one per message.
-        self._gnn_coordinator = gnn_coordinator
-
-        # Thread handles — populated by start()
-        self._listener_thread: threading.Thread | None = None
-        self._processor_thread: threading.Thread | None = None
-
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
-
-    def start(self) -> None:
-        """Spawn listener and processor daemon threads."""
-        if self.running:
-            logger.warning(
-                "CommunicationLayer.start() called while already running"
-            )
-            return
-
-        self.running = True
-
-        self._listener_thread = threading.Thread(
-            target=self._listen_for_connections,
-            daemon=True,
-            name="comm-listener",
-        )
-        self._processor_thread = threading.Thread(
-            target=self._process_messages,
-            daemon=True,
-            name="comm-processor",
-        )
-        self._listener_thread.start()
-        self._processor_thread.start()
-        logger.info(
-            "CommunicationLayer started on %s:%d", self.host, self.port
+        # Action space: 6-dimensional continuous actions
+        self.action_space = Box(
+            low=-1.0, high=1.0, shape=(6,), dtype=np.float32
         )
 
-    def stop(self) -> None:
-        """Signal threads to exit, join them, close all sockets."""
-        self.running = False
+        # Observation space: 10-dimensional state vector
+        self.observation_space = Box(
+            low=-np.inf, high=np.inf, shape=(10,), dtype=np.float32
+        )
 
-        # Threads use timeouts so they will notice ``running is False``
-        if self._listener_thread is not None:
-            self._listener_thread.join(timeout=self._ACCEPT_TIMEOUT_S + 1.0)
-        if self._processor_thread is not None:
-            self._processor_thread.join(timeout=self._QUEUE_TIMEOUT_S + 1.0)
+        # RNG for reproducibility
+        self.np_random = None
+        self.seed()
 
-        # Close every accepted client socket
-        with self._clients_lock:
-            for client in self.clients:
-                try:
-                    client.close()
-                except OSError:
-                    pass
-            self.clients.clear()
+    def seed(self, seed=None):
+        """Seed the environment's RNG."""
+        self.np_random, seed = seeding.np_random(seed)
+        return [seed]
 
-        # Close the server socket
-        try:
-            self.sock.close()
-        except OSError:
-            pass
+    def reset(self) -> np.ndarray:
+        """Reset the environment to initial state."""
+        self.battery_level = self.initial_battery
+        self.consumption = 0.0
+        self.production = 0.0
+        self.supply = 0.0
+        self.demand = 0.0
+        self.current_price = 0.3
+        self.timestep = 0
+        return self._get_observation()
 
-        logger.info("CommunicationLayer stopped.")
-
-    # ------------------------------------------------------------------
-    # Thread targets
-    # ------------------------------------------------------------------
-
-    def _listen_for_connections(self) -> None:
-        while self.running:
-            try:
-                client, addr = self.sock.accept()
-                logger.info("Connection from %s", addr)
-                with self._clients_lock:
-                    self.clients.append(client)
-            except socket.timeout:
-                # No connection within the timeout — re-check self.running
-                continue
-            except OSError:
-                if not self.running:
-                    break
-                logger.exception("Unexpected OSError in listener thread")
-                break
-
-    def _process_messages(self) -> None:
-        while self.running:
-            try:
-                message = self.message_queue.get(
-                    timeout=self._QUEUE_TIMEOUT_S
-                )
-            except queue.Empty:
-                continue
-
-            try:
-                self._route_message(message)
-            except Exception:
-                logger.exception("Error processing message: %s", message)
-            finally:
-                self.message_queue.task_done()
-
-    # ------------------------------------------------------------------
-    # Routing
-    # ------------------------------------------------------------------
-
-    def _route_message(self, message: Dict[str, Any]) -> None:
-        component_type = message.get("component_type")
-        if component_type == "gnn":
-            self._send_to_gnn(message)
-        elif component_type == "agent":
-            self._send_to_agent(message)
-        elif component_type == "grid":
-            self._send_to_grid(message)
-        else:
-            logger.warning("Unknown component_type: %r", component_type)
-
-    def _send_to_gnn(self, message: Dict[str, Any]) -> None:
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
         """
-        Run GNN training synchronously.
+        Execute one timestep.
 
-        WARNING: this blocks the message-processing thread for the
-        full duration of training.  All other queued messages stall.
+        Args:
+            action: Action vector (6-dimensional).
+
+        Returns:
+            (observation, reward, done, info)
         """
-        if self._gnn_coordinator is None:
-            # ASSUMPTION: GNNCoordinator() accepts zero arguments.
-            self._gnn_coordinator = GNNCoordinator()
+        self.timestep += 1
 
-        self._gnn_coordinator.run(
-            num_epochs=message.get("epochs", 100)
+        # Parse action (simplified placeholder)
+        battery_charge = np.clip(action[0], -1.0, 1.0)
+        consumption_adjust = np.clip(action[1], -1.0, 1.0)
+
+        # Update battery
+        self.battery_level = np.clip(
+            self.battery_level + battery_charge,
+            0.0,
+            self.max_battery,
         )
 
-        # ASSUMPTION: config exposes LOG_DIR via attribute access.
-        # grid_env.py uses config['key'] (dict access).
-        # One of these patterns will fail — verify config.py.
-        log_training_data(
-            log_dir=config.LOG_DIR,
-            episode=message.get("episode", 1),
-            total_reward=message.get("total_reward", 0.0),
-            avg_house_reward=message.get("avg_house_reward", 0.0),
-            avg_market_reward=message.get("avg_market_reward", 0.0),
-            avg_grid_reward=message.get("avg_grid_reward", 0.0),
-            step=message.get("step", 1),
+        # Update consumption (placeholder)
+        base_consumption = float(self.np_random.uniform(1.0, 5.0))
+        self.consumption = base_consumption * (1.0 + consumption_adjust * 0.2)
+
+        # Update production (placeholder)
+        self.production = float(self.np_random.uniform(0.0, 3.0))
+
+        # Compute supply/demand
+        self.supply = self.production
+        self.demand = self.consumption
+
+        # Compute reward (placeholder)
+        reward = self.production - self.consumption
+
+        # Episode terminates after a fixed horizon (handled by GridEnv)
+        done = False
+
+        info = {
+            "house_id": self.house_id,
+            "timestep": self.timestep,
+            "battery_level": self.battery_level,
+            "consumption": self.consumption,
+            "production": self.production,
+        }
+
+        return self._get_observation(), reward, done, info
+
+    def _get_observation(self) -> np.ndarray:
+        """
+        Build the current observation vector.
+
+        Returns:
+            np.ndarray of shape (10,)
+        """
+        return np.array(
+            [
+                self.battery_level,
+                self.consumption,
+                self.production,
+                self.current_price,
+                self.supply,
+                self.demand,
+                self.timestep,
+                0.0,  # placeholder
+                0.0,  # placeholder
+                0.0,  # placeholder
+            ],
+            dtype=np.float32,
         )
 
-    def _send_to_agent(self, message: Dict[str, Any]) -> None:
-        agent_id = message.get("agent_id")
-        reward = message.get("reward", 0.0)
-        action = message.get("action", "none")
-        logger.info(
-            "Agent %s received reward: %s, action: %s",
-            agent_id, reward, action,
+    def get_state(self) -> np.ndarray:
+        """
+        Return the current state (alias for _get_observation for compatibility).
+
+        Used by GridEnv when building observations.
+        """
+        return self._get_observation()
+
+    def render(self, mode: str = "human") -> None:
+        """Render the environment for debugging."""
+        print(
+            f"House {self.house_id} — Step {self.timestep} — "
+            f"Battery: {self.battery_level:.2f}/{self.max_battery:.2f}, "
+            f"Consumption: {self.consumption:.2f}, "
+            f"Production: {self.production:.2f}"
         )
 
-    def _send_to_grid(self, message: Dict[str, Any]) -> None:
-        # NOTE: datetime.now() fallback is non-deterministic.
-        # Callers should supply an explicit timestamp for reproducibility.
-        log_simulation_data(
-            log_dir=config.LOG_DIR,
-            timestamp=message.get(
-                "timestamp", datetime.now().isoformat()
-            ),
-            grid_balance=message.get("grid_balance", 0.0),
-            market_balance=message.get("market_balance", 0.0),
-            household_consumption=message.get("household_consumption", 0.0),
-            solar_production=message.get("solar_production", 0.0),
-            wind_production=message.get("wind_production", 0.0),
-        )
-
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-
-    def send_message(self, message: Dict[str, Any]) -> None:
-        """Enqueue a message for asynchronous processing."""
-        self.message_queue.put(message)
+    def close(self) -> None:
+        """Release resources (currently a no-op)."""
+        pass
