@@ -22,7 +22,7 @@ ASSUMPTIONS (unverified — require source files)
 """
 
 import numpy as np
-from typing import Tuple
+from typing import Any, Dict, Tuple
 
 from gymnasium import Env
 from gymnasium.spaces import Box, Discrete
@@ -47,7 +47,7 @@ class MarketEnv(Env):
             [supply, demand, energy_price, price_change, net_position]
     """
 
-    metadata = {"render.modes": ["human"]}
+    metadata = {"render_modes": ["human"]}
 
     # How much a single buy/sell action shifts supply or demand.
     # Exposed as class attribute so tests / configs can override.
@@ -106,8 +106,12 @@ class MarketEnv(Env):
     # Core gym interface
     # ==================================================================
 
-    def reset(self) -> np.ndarray:
-        """Reset the environment to the initial state."""
+    def reset(
+        self, *, seed: int | None = None, options: dict | None = None
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        """Reset the environment to the initial state (Gymnasium API)."""
+        if seed is not None:
+            self.seed(seed)
         self.current_time = 0
         self.total_supply = 0.0
         self.total_demand = 0.0
@@ -119,11 +123,12 @@ class MarketEnv(Env):
         # Read initial market state from data
         self._apply_market_data()
 
-        return self._get_observation()
+        info = {"current_time": self.current_time}
+        return self._get_observation(), info
 
     def step(
         self, action: int
-    ) -> Tuple[np.ndarray, float, bool, dict]:
+    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """
         Execute one timestep.
 
@@ -132,7 +137,7 @@ class MarketEnv(Env):
                     2 = sell (increases supply).
 
         Returns:
-            (observation, reward, done, info)
+            (observation, reward, terminated, truncated, info)
         """
         if not self.action_space.contains(action):
             raise ValueError(
@@ -140,10 +145,21 @@ class MarketEnv(Env):
                 f"{{0, ..., {self.num_actions - 1}}}"
             )
 
-        self.prev_price = self.energy_price
+        if self.current_time >= self._max_steps:
+            info = {
+                "current_time": self.current_time,
+                "action": action,
+                "supply": self.total_supply,
+                "demand": self.total_demand,
+                "energy_price": self.energy_price,
+                "price_change": self.energy_price - self.prev_price,
+                "net_position": self.net_position,
+                "step_reward": 0.0,
+                "total_reward": self.total_reward,
+            }
+            return self._get_observation(), 0.0, True, False, info
 
-        # Advance time
-        self.current_time += 1
+        self.prev_price = self.energy_price
 
         # --- ground supply / demand from market data ---------------------
         self._apply_market_data()
@@ -166,7 +182,8 @@ class MarketEnv(Env):
         self.total_reward += reward
 
         # --- termination -------------------------------------------------
-        done = self.current_time >= self._max_steps
+        terminated = self.current_time >= (self._max_steps - 1)
+        truncated = False
 
         # --- info --------------------------------------------------------
         info = {
@@ -181,7 +198,12 @@ class MarketEnv(Env):
             "total_reward": self.total_reward,
         }
 
-        return self._get_observation(), reward, done, info
+        if not terminated:
+            self.current_time += 1
+        else:
+            self.current_time = self._max_steps
+
+        return self._get_observation(), reward, terminated, truncated, info
 
     # ==================================================================
     # Observation
