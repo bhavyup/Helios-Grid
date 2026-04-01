@@ -101,7 +101,7 @@ def load_grid_topology(
     try:
         # Read as DataFrame first to validate structure
         df = pd.read_json(file_path, orient="index")
-        result = df.to_dict()
+        result = df.to_dict(orient="index")
 
         # Validate that result is a dict mapping node IDs to properties
         if not isinstance(result, dict):
