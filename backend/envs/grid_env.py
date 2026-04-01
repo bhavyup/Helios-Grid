@@ -108,6 +108,16 @@ class GridEnv(Env):
     def seed(self, seed=None):
         """Seed all internal RNGs for reproducibility."""
         self.np_random, seed = seeding.np_random(seed)
+        base_seed = int(seed)
+
+        # Reseed household sub-environments deterministically.
+        for idx, house in enumerate(self.house_environments):
+            house.seed(base_seed + idx + 1)
+
+        # Reseed coordinator RNGs deterministically.
+        self.gnn_coordinator.seed = base_seed + len(self.house_environments) + 1
+        self.gnn_coordinator.seed_everything(self.gnn_coordinator.seed)
+
         return [seed]
 
     # ------------------------------------------------------------------
