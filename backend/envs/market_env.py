@@ -111,8 +111,6 @@ class MarketEnv(Env):
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """Reset the environment to the initial state (Gymnasium API)."""
         super().reset(seed=seed)
-        if seed is not None:
-            self.np_random, _ = seeding.np_random(seed)
         self.current_time = 0
         self.total_supply = 0.0
         self.total_demand = 0.0
