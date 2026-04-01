@@ -33,14 +33,16 @@ class HouseEnv(Env):
 
     Action space:
         Box(shape=(6,), dtype=np.float32)
-            [battery_charge, battery_discharge, consumption_adjust, ...]
+            [battery_charge, consumption_adjust, unused, unused, unused, unused]
+            NOTE: step() currently consumes action[0] and action[1] only;
+            action[2:] are accepted by the Box space but ignored.
 
     Observation space:
         Box(shape=(10,), dtype=np.float32)
             [battery_level, consumption, production, price, ...]
     """
 
-    metadata = {"render.modes": ["human"]}
+    metadata = {"render_modes": ["human"]}
 
     def __init__(
         self,
@@ -87,8 +89,13 @@ class HouseEnv(Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def reset(self) -> np.ndarray:
-        """Reset the environment to initial state."""
+    def reset(
+        self, *, seed: int | None = None, options: dict | None = None
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
+        """Reset the environment to initial state (Gymnasium API)."""
+        _ = options
+        if seed is not None:
+            self.seed(seed)
         self.battery_level = self.initial_battery
         self.consumption = 0.0
         self.production = 0.0
@@ -96,17 +103,23 @@ class HouseEnv(Env):
         self.demand = 0.0
         self.current_price = 0.3
         self.timestep = 0
-        return self._get_observation()
+        observation = self._get_observation()
+        info = {"house_id": self.house_id, "timestep": self.timestep}
+        return observation, info
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, dict]:
+    def step(
+        self, action: np.ndarray
+    ) -> Tuple[np.ndarray, float, bool, bool, Dict[str, Any]]:
         """
         Execute one timestep.
 
         Args:
-            action: Action vector (6-dimensional).
+            action: Action vector (6-dimensional), where step() currently uses
+                action[0] as battery_charge and action[1] as consumption_adjust.
+                action[2:] are currently unused.
 
         Returns:
-            (observation, reward, done, info)
+            (observation, reward, terminated, truncated, info)
         """
         self.timestep += 1
 
@@ -136,7 +149,8 @@ class HouseEnv(Env):
         reward = self.production - self.consumption
 
         # Episode terminates after a fixed horizon (handled by GridEnv)
-        done = False
+        terminated = False
+        truncated = False
 
         info = {
             "house_id": self.house_id,
@@ -146,7 +160,7 @@ class HouseEnv(Env):
             "production": self.production,
         }
 
-        return self._get_observation(), reward, done, info
+        return self._get_observation(), reward, terminated, truncated, info
 
     def _get_observation(self) -> np.ndarray:
         """

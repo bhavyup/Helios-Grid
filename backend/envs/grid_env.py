@@ -181,14 +181,13 @@ class GridEnv(Env):
         market_actions = actions["market_actions"]
 
         # --- step each household ------------------------------------------
-        # ASSUMPTION: HouseEnv.step() returns a state array (not a standard
-        #   gym 4-tuple).  If HouseEnv follows the gym convention
-        #   (obs, reward, done, info), this line must unpack the tuple and
-        #   house-level rewards should be accumulated.
+        # HouseEnv.step follows Gymnasium convention and returns
+        # (obs, reward, terminated, truncated, info). We only need obs here.
         house_step_results = []
         for i, house in enumerate(self.house_environments):
             result = house.step(house_actions[i])
-            house_step_results.append(result)
+            house_obs = result[0] if isinstance(result, tuple) else result
+            house_step_results.append(house_obs)
 
         # --- GNN coordination --------------------------------------------
         # TODO: coordination_signals are computed but not yet consumed.
