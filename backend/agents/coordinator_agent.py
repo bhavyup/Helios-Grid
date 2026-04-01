@@ -119,11 +119,13 @@ class CoordinatorAgent:
             num_solar_panels=num_solar_panels,
             num_wind_turbines=num_wind_turbines,
         )
-        self.gnn_coordinator = GNNCoordinator(
-            graph=graph,
-            seed=seed,
-            log_dir=log_dir,
-        )
+        gnn_kwargs: Dict[str, Any] = {
+            "graph": graph,
+            "log_dir": log_dir,
+        }
+        if seed is not None:
+            gnn_kwargs["seed"] = seed
+        self.gnn_coordinator = GNNCoordinator(**gnn_kwargs)
 
         self.market_model = MarketModel(
             num_households=num_households,
