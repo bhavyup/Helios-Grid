@@ -5,8 +5,8 @@ from typing import Dict, Any
 from datetime import datetime
 
 from config import config
-from logging_utils import log_simulation_data, log_training_data
-from gnn_coordinator import GNNCoordinator
+from utils.logging_utils import log_simulation_data, log_training_data
+from models.gnn_coordinator import GNNCoordinator
 
 
 class CommunicationLayer:
@@ -83,6 +83,15 @@ class CommunicationLayer:
 
     def stop(self) -> None:
         """Shut down threads, close all sockets."""
+        # Let processor threads drain queue before signaling stop.
+        while not self.message_queue.empty():
+            try:
+                self._send_message_to_component(self.message_queue.get_nowait())
+            except queue.Empty:
+                break
+            except Exception as exc:
+                print(f"[CommunicationLayer] Error processing message: {exc}")
+
         self.running = False
 
         # Close server socket to unblock accept() if it's between timeouts
@@ -129,7 +138,7 @@ class CommunicationLayer:
 
     def _process_messages(self) -> None:
         """Block-wait on queue and dispatch messages until stopped."""
-        while self.running:
+        while self.running or not self.message_queue.empty():
             try:
                 message = self.message_queue.get(
                     block=True, timeout=self._QUEUE_POLL_TIMEOUT_S
@@ -193,7 +202,13 @@ class CommunicationLayer:
         agent_id = message.get("agent_id")
         reward = message.get("reward", 0.0)
         action = message.get("action", "none")
-        print(f"Agent {agent_id} received reward: {reward}, action: {action}")
+        price = message.get("price")
+        consumption = message.get("consumption")
+        energy = message.get("energy")
+        print(
+            f"Agent {agent_id} received reward: {reward}, action: {action}, "
+            f"price: {price}, consumption: {consumption}, energy: {energy}"
+        )
 
     def _send_to_grid(self, message: Dict[str, Any]) -> None:
         """Logs grid-level simulation data.  Does not send over network."""
