@@ -45,7 +45,8 @@ reproducibility:
 env:
   num_households: 10          # household agents in the grid
   max_episode_steps: 1000     # CANONICAL: maximum timesteps per episode (per-episode cap)
-                              # The config loader maps training.training_steps to this
+                              # The config loader maps deprecated top-level
+                              # training_steps to this
                               # when only training_steps is present (backward compatibility)
   max_battery: 10             # per-household battery capacity (kWh)
   time_step_hours: 1          # simulation resolution (hours)
@@ -110,8 +111,7 @@ training:
   episodes: 1000              # total training episodes
   training_steps: 1000        # CANONICAL: global training-update budget
                               # (total optimizer/gradient updates across training)
-                              # Loader keeps deprecated alias "training_total_steps"
-                              # mapped to this key for backward compatibility.
+                              # This is distinct from env.max_episode_steps.
   steps_per_episode: 24       # timesteps the orchestrator runs per
                               # episode in its own loop.
                               # NOTE: this is DISTINCT from
@@ -181,7 +181,4 @@ num_households: 10            # ←── keep in sync with env.num_households
 training_steps: 1000          # ←── DEPRECATED alias for env.max_episode_steps
                               # Config loader should derive env.max_episode_steps from this
                               # when env.max_episode_steps is absent (backward compatibility)
-training_total_steps: 1000    # ←── DEPRECATED alias for training.training_steps
-                              # Config loader derives this from training.training_steps
-                              # for backward compatibility with older top-level access.
 max_battery: 10               # ←── keep in sync with env.max_battery

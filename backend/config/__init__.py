@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 
@@ -19,8 +19,8 @@ class ConfigNode(dict):
         self[key] = value
 
 
-def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
-    merged: Dict[str, Any] = dict(base)
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = dict(base)
     for key, value in override.items():
         if (
             key in merged
@@ -33,7 +33,7 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
     return merged
 
 
-def _load_yaml(path: Path) -> Dict[str, Any]:
+def _load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as handle:
@@ -54,9 +54,9 @@ def _as_confignode(value: Any) -> Any:
     return value
 
 
-def _apply_aliases(raw: Dict[str, Any]) -> Dict[str, Any]:
+def _apply_aliases(raw: dict[str, Any]) -> dict[str, Any]:
     env = raw.setdefault("env", {})
-    training = raw.setdefault("training", {})
+    raw.setdefault("training", {})
 
     # Canonical: env.max_episode_steps (per-episode cap).
     # Deprecated alias: top-level training_steps.
@@ -65,13 +65,6 @@ def _apply_aliases(raw: Dict[str, Any]) -> Dict[str, Any]:
     if "max_episode_steps" in env:
         raw["training_steps"] = env["max_episode_steps"]
         raw["max_episode_steps"] = env["max_episode_steps"]
-
-    # Canonical: training.training_steps (global training-update budget).
-    # Deprecated alias: top-level training_total_steps.
-    if "training_steps" not in training and "training_total_steps" in raw:
-        training["training_steps"] = raw["training_total_steps"]
-    if "training_steps" in training:
-        raw["training_total_steps"] = training["training_steps"]
 
     # Backward-compatible top-level aliases used by legacy modules.
     if "num_households" in env:

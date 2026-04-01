@@ -7,3 +7,4 @@ seaborn>=0.13.2
 scikit-learn
 tqdm
 networkx
+PyYAML>=6.0

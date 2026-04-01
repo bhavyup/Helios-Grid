@@ -20,12 +20,13 @@ data_paths:
 # Environment defaults
 env:
   num_households: 10
+  max_episode_steps: 1000  # CANONICAL per-episode environment horizon cap
   max_battery: 10        # Battery capacity in kWh
   time_step_hours: 1     # Simulation time resolution in hours
 
 # Training defaults
 training:
-  training_steps: 1000   # Total gradient update steps across all episodes
+  training_steps: 1000   # CANONICAL global optimizer/gradient update budget
   episodes: 1000         # Total episodes to run
   save_interval: 50      # Checkpoint every N episodes
 
