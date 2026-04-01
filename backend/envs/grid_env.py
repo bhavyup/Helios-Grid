@@ -73,7 +73,7 @@ class GridEnv(Env):
         # ------------------------------------------------------------------
         self.action_space = GymDict({
             "house_actions": Box(
-                low=0, high=1, shape=(num_households, 6), dtype=np.float32
+                low=-1.0, high=1.0, shape=(num_households, 6), dtype=np.float32
             ),
             "market_actions": Discrete(2),  # 0 = hold, 1 = trade
         })
