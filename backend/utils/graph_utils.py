@@ -9,7 +9,7 @@ required because ``GNNCoordinator`` converts edge lists to
 
 Node metadata (type, label) is stored as node attributes::
 
-    graph.nodes[0]  →  {"type": "household", "label": "House_0"}
+    graph.nodes[0]  →  {"type": "grid", "label": "Grid"}
 
 GRAPH STRUCTURE
 ===============
@@ -53,6 +53,19 @@ def create_grid_graph(
         ``N = 1 + num_households + num_solar_panels + num_wind_turbines``.
         Node 0 is the central grid hub.
     """
+    invalid_params = [
+        (name, value)
+        for name, value in (
+            ("num_households", num_households),
+            ("num_solar_panels", num_solar_panels),
+            ("num_wind_turbines", num_wind_turbines),
+        )
+        if value < 0
+    ]
+    if invalid_params:
+        details = ", ".join(f"{name}={value}" for name, value in invalid_params)
+        raise ValueError(f"Graph node counts must be non-negative; got {details}")
+
     G = nx.Graph()
     node_id = 0
 
