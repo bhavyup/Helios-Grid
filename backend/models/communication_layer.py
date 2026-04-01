@@ -84,7 +84,7 @@ class CommunicationLayer:
     def stop(self) -> None:
         """Shut down threads, close all sockets."""
         # Let processor threads drain queue before signaling stop.
-        while not self.message_queue.empty():
+        while True:
             try:
                 self._send_message_to_component(self.message_queue.get_nowait())
             except queue.Empty:
