@@ -20,7 +20,7 @@ Every assumption is cited inline.  No behavior is invented.
 SOURCE OF TRUTH
 ===============
 grid_env.py declares:
-    house_actions : Box(low=0, high=1, shape=(N, 6), dtype=float32)
+    house_actions : Box(low=-1.0, high=1.0, shape=(N, 6), dtype=float32)
     house_states  : Box(low=-inf, high=inf, shape=(N, 10), dtype=float32)
 
 Per-household slice:  action (6,)  →  state (10,)
@@ -45,7 +45,7 @@ from envs.house_env import HouseEnv
 # ===========================================================================
 # Constants derived from grid_env.py's space declarations
 # ===========================================================================
-ACTION_DIM = 6          # Box(low=0, high=1, shape=(N, 6))
+ACTION_DIM = 6          # Box(low=-1.0, high=1.0, shape=(N, 6))
 OBS_DIM = 10            # Box(shape=(N, 10), dtype=float32)
 ACTION_DTYPE = np.float32
 OBS_DTYPE = np.float32
@@ -58,7 +58,7 @@ OBS_DTYPE = np.float32
 def _make_action(value: float = 0.5) -> np.ndarray:
     """
     Produce a valid per-household action matching grid_env.py's
-    Box(low=0, high=1, shape=(N, 6)) sliced to shape (6,).
+    Box(low=-1.0, high=1.0, shape=(N, 6)) sliced to shape (6,).
     """
     return np.full(ACTION_DIM, value, dtype=ACTION_DTYPE)
 
@@ -281,7 +281,7 @@ class TestActionSpace:
 
     @pytest.mark.parametrize("value", [0.0, 0.25, 0.5, 0.75, 1.0])
     def test_boundary_values_accepted(self, reset_env, value):
-        """Box(low=0, high=1) boundary and interior values."""
+        """Box(low=-1.0, high=1.0) boundary and interior values."""
         result = reset_env.step(_make_action(value))
         obs, _, _, _ = _unpack_step(result)
         _assert_valid_obs(obs, f"action value={value}")

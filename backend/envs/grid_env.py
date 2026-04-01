@@ -124,8 +124,14 @@ class GridEnv(Env):
     # Core gym interface
     # ------------------------------------------------------------------
 
-    def reset(self) -> Dict[str, np.ndarray]:
+    def reset(
+        self, *, seed: int | None = None, options: dict | None = None
+    ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
         """Reset the environment to the initial state."""
+        del options  # currently unused
+        if seed is not None:
+            self.seed(seed)
+
         self.current_time = 0
         self.episode_count += 1
         self.episode_length = 0
@@ -136,11 +142,18 @@ class GridEnv(Env):
 
         self.gnn_coordinator.reset()
 
-        return self._get_observation()
+        observation = self._get_observation()
+        info = {
+            "episode_count": self.episode_count,
+            "episode_length": self.episode_length,
+            "current_time": self.current_time,
+            "total_reward": self.total_reward,
+        }
+        return observation, info
 
     def step(
         self, actions: Dict[str, Any]
-    ) -> Tuple[Dict[str, np.ndarray], float, bool, dict]:
+    ) -> Tuple[Dict[str, np.ndarray], float, bool, bool, Dict[str, Any]]:
         """
         Execute one timestep.
 
@@ -148,7 +161,7 @@ class GridEnv(Env):
             actions: Dict with keys ``"house_actions"`` and ``"market_actions"``.
 
         Returns:
-            (observation, reward, done, info)
+            (observation, reward, terminated, truncated, info)
         """
         self.episode_length += 1
 
@@ -211,7 +224,8 @@ class GridEnv(Env):
         self.total_reward += step_reward
 
         # --- termination --------------------------------------------------
-        done = self.episode_length >= self.max_episode_steps
+        terminated = False
+        truncated = self.episode_length >= self.max_episode_steps
 
         # --- logging ------------------------------------------------------
         log_env_info(
@@ -232,7 +246,7 @@ class GridEnv(Env):
             "coordination_signals": coordination_signals,
         }
 
-        return self._get_observation(), step_reward, done, info
+        return self._get_observation(), step_reward, terminated, truncated, info
 
     # ------------------------------------------------------------------
     # Observation helpers
