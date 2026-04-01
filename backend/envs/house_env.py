@@ -93,7 +93,6 @@ class HouseEnv(Env):
         self, *, seed: int | None = None, options: dict | None = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """Reset the environment to initial state (Gymnasium API)."""
-        _ = options
         if seed is not None:
             self.seed(seed)
         self.battery_level = self.initial_battery
