@@ -128,7 +128,7 @@ class GridEnv(Env):
         self, *, seed: int | None = None, options: dict | None = None
     ) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
         """Reset the environment to the initial state."""
-        del options  # currently unused
+        _ = options
         if seed is not None:
             self.seed(seed)
 

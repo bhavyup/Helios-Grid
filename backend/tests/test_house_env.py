@@ -279,7 +279,7 @@ class TestStep:
 
 class TestActionSpace:
 
-    @pytest.mark.parametrize("value", [0.0, 0.25, 0.5, 0.75, 1.0])
+    @pytest.mark.parametrize("value", [-1.0, -0.5, 0.0, 0.5, 1.0])
     def test_boundary_values_accepted(self, reset_env, value):
         """Box(low=-1.0, high=1.0) boundary and interior values."""
         result = reset_env.step(_make_action(value))
