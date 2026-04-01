@@ -110,8 +110,9 @@ class MarketEnv(Env):
         self, *, seed: int | None = None, options: dict | None = None
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """Reset the environment to the initial state (Gymnasium API)."""
+        super().reset(seed=seed)
         if seed is not None:
-            self.seed(seed)
+            self.np_random, _ = seeding.np_random(seed)
         self.current_time = 0
         self.total_supply = 0.0
         self.total_demand = 0.0
@@ -145,20 +146,6 @@ class MarketEnv(Env):
                 f"{{0, ..., {self.num_actions - 1}}}"
             )
 
-        if self.current_time >= self._max_steps:
-            info = {
-                "current_time": self.current_time,
-                "action": action,
-                "supply": self.total_supply,
-                "demand": self.total_demand,
-                "energy_price": self.energy_price,
-                "price_change": self.energy_price - self.prev_price,
-                "net_position": self.net_position,
-                "step_reward": 0.0,
-                "total_reward": self.total_reward,
-            }
-            return self._get_observation(), 0.0, True, False, info
-
         self.prev_price = self.energy_price
 
         # --- ground supply / demand from market data ---------------------
@@ -181,8 +168,11 @@ class MarketEnv(Env):
         )
         self.total_reward += reward
 
+        # Advance time for next call
+        self.current_time += 1
+
         # --- termination -------------------------------------------------
-        terminated = self.current_time >= (self._max_steps - 1)
+        terminated = self.current_time >= self._max_steps
         truncated = False
 
         # --- info --------------------------------------------------------
