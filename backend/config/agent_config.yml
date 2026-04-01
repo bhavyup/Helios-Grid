@@ -181,4 +181,7 @@ num_households: 10            # ←── keep in sync with env.num_households
 training_steps: 1000          # ←── DEPRECATED alias for env.max_episode_steps
                               # Config loader should derive env.max_episode_steps from this
                               # when env.max_episode_steps is absent (backward compatibility)
+training_total_steps: 1000    # ←── DEPRECATED alias for training.training_steps
+                              # Config loader derives this from training.training_steps
+                              # (and vice versa) for backward compatibility.
 max_battery: 10               # ←── keep in sync with env.max_battery

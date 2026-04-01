@@ -56,21 +56,27 @@ def _as_confignode(value: Any) -> Any:
 
 def _apply_aliases(raw: dict[str, Any]) -> dict[str, Any]:
     env = raw.setdefault("env", {})
-    raw.setdefault("training", {})
+    training = raw.setdefault("training", {})
 
     # Canonical: env.max_episode_steps (per-episode cap).
     # Deprecated alias: top-level training_steps.
     if "max_episode_steps" not in env and "training_steps" in raw:
         env["max_episode_steps"] = raw["training_steps"]
     if "max_episode_steps" in env:
-        raw["training_steps"] = env["max_episode_steps"]
-        raw["max_episode_steps"] = env["max_episode_steps"]
+        raw.setdefault("training_steps", env["max_episode_steps"])
+        raw.setdefault("max_episode_steps", env["max_episode_steps"])
+
+    # Canonical: training.training_steps (global training-update budget).
+    if "training_steps" in training:
+        raw.setdefault("training_total_steps", training["training_steps"])
+    elif "training_total_steps" in raw:
+        training["training_steps"] = raw["training_total_steps"]
 
     # Backward-compatible top-level aliases used by legacy modules.
     if "num_households" in env:
-        raw["num_households"] = env["num_households"]
+        raw.setdefault("num_households", env["num_households"])
     if "max_battery" in env:
-        raw["max_battery"] = env["max_battery"]
+        raw.setdefault("max_battery", env["max_battery"])
     if "logging" in raw and isinstance(raw["logging"], dict):
         if "log_dir" in raw["logging"]:
             raw["LOG_DIR"] = raw["logging"]["log_dir"]
