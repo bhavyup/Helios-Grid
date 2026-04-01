@@ -96,6 +96,8 @@ class GridEnv(Env):
         self.episode_count = 0
         self.episode_length = 0
         self.total_reward = 0.0
+        self._grid_state = np.zeros((self.num_households, 10), dtype=np.float32)
+        self._market_state = np.zeros((self.num_households, 2), dtype=np.float32)
 
         # Deterministic RNG — seeded lazily; call seed() to set explicitly
         self.np_random = None
@@ -142,6 +144,8 @@ class GridEnv(Env):
             house.reset()
 
         self.gnn_coordinator.reset()
+        self._update_grid_state()
+        self._update_market_state()
 
         observation = self._get_observation()
         info = {
@@ -223,6 +227,8 @@ class GridEnv(Env):
 
         step_reward = market_reward
         self.total_reward += step_reward
+        self._update_grid_state()
+        self._update_market_state()
 
         # --- termination --------------------------------------------------
         terminated = False
@@ -277,9 +283,7 @@ class GridEnv(Env):
 
         NOTE: placeholder — replace with actual grid-state computation.
         """
-        return self.np_random.uniform(
-            size=(self.num_households, 10)
-        ).astype(np.float32)
+        return self._grid_state.copy()
 
     def _get_market_state(self) -> np.ndarray:
         """
@@ -290,7 +294,17 @@ class GridEnv(Env):
 
         NOTE: placeholder — replace with actual market-state computation.
         """
-        return self.np_random.uniform(
+        return self._market_state.copy()
+
+    def _update_grid_state(self) -> None:
+        """Update cached grid state when environment state changes."""
+        self._grid_state = self.np_random.uniform(
+            size=(self.num_households, 10)
+        ).astype(np.float32)
+
+    def _update_market_state(self) -> None:
+        """Update cached market state when environment state changes."""
+        self._market_state = self.np_random.uniform(
             size=(self.num_households, 2)
         ).astype(np.float32)
 
