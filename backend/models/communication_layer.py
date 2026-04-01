@@ -83,16 +83,13 @@ class CommunicationLayer:
 
     def stop(self) -> None:
         """Shut down threads, close all sockets."""
-        # Let processor threads drain queue before signaling stop.
-        while True:
-            try:
-                self._send_message_to_component(self.message_queue.get_nowait())
-            except queue.Empty:
-                break
-            except Exception as exc:
-                print(f"[CommunicationLayer] Error processing message: {exc}")
-
         self.running = False
+
+        # Wait for daemon threads to exit (bounded). Processor thread drains
+        # queued messages because its loop is `while self.running or queue not empty`.
+        for t in self._threads:
+            t.join(timeout=self._THREAD_JOIN_TIMEOUT_S)
+        self._threads.clear()
 
         # Close server socket to unblock accept() if it's between timeouts
         try:
@@ -107,11 +104,6 @@ class CommunicationLayer:
             except OSError:
                 pass
         self.clients.clear()
-
-        # Wait for daemon threads to exit (bounded)
-        for t in self._threads:
-            t.join(timeout=self._THREAD_JOIN_TIMEOUT_S)
-        self._threads.clear()
 
         print("Communication Layer stopped.")
 
