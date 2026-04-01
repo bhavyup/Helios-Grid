@@ -31,12 +31,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from config import config
+from app.core.project_config import config
 
 # Only imported if the agent needs to log independently.
 # In a well-integrated system the orchestrator handles logging;
 # the agent should not need this.  Retained for backward compat.
-from utils.logging_utils import log_simulation_data
+from app.utils.logging_utils import log_simulation_data
 
 logger = logging.getLogger(__name__)
 

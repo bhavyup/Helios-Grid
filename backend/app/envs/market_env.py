@@ -24,12 +24,12 @@ ASSUMPTIONS (unverified — require source files)
 import numpy as np
 from typing import Tuple
 
-from gym import Env
-from gym.spaces import Box, Discrete
-from gym.utils import seeding
+from gymnasium import Env
+from gymnasium.spaces import Box, Discrete
+from gymnasium.utils import seeding
 
-from utils.data_utils import load_market_data
-from utils.reward_utils import compute_market_reward
+from app.utils.data_utils import load_market_data
+from app.utils.reward_utils import compute_market_reward
 
 
 class MarketEnv(Env):
@@ -47,7 +47,7 @@ class MarketEnv(Env):
             [supply, demand, energy_price, price_change, net_position]
     """
 
-    metadata = {"render.modes": ["human"]}
+    metadata = {"render_modes": ["human"]}
 
     # How much a single buy/sell action shifts supply or demand.
     # Exposed as class attribute so tests / configs can override.

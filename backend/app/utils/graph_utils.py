@@ -101,7 +101,7 @@ def build_grid_graph(
 
     This function exists for compatibility with ``grid_env.py``::
 
-        from utils.graph_utils import build_grid_graph
+        from app.utils.graph_utils import build_grid_graph
         self.graph = build_grid_graph(grid_topology_file, num_households)
 
     ASSUMPTION: ``grid_env.py`` passes a file path and a household

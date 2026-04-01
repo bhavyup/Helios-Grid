@@ -13,8 +13,8 @@ USAGE
 =====
 ::
 
-    from utils.logging_utils import load_logs_from_jsonl
-    from utils.plot_utils import plot_rewards, plot_simulation_data
+    from app.utils.logging_utils import load_logs_from_jsonl
+    from app.utils.plot_utils import plot_rewards, plot_simulation_data
 
     training_logs = load_logs_from_jsonl("logs/training_log.jsonl")
     plot_rewards(training_logs, log_dir="logs/plots")

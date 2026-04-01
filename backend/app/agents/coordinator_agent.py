@@ -53,21 +53,22 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from config import config
+from app.core.project_config import config
+from app.utils.graph_utils import create_grid_graph
 
 # ASSUMPTION: import paths aligned with grid_env.py convention.
 # Adjust if the actual package layout differs.
-from utils.logging_utils import log_simulation_data
-from models.gnn_coordinator import GNNCoordinator
+from app.utils.logging_utils import log_simulation_data
+from app.models.gnn_coordinator import GNNCoordinator
 
 # ASSUMPTION: MarketModel lives here.  Unverified.
-from models.market_model import MarketModel
+from app.models.market_model import MarketModel
 
 # CommunicationLayer is optional infrastructure.
 # Import is guarded so the module loads even if the comm layer
 # has not been implemented or has been moved.
 try:
-    from infra.communication import CommunicationLayer  # ASSUMPTION: path
+    from app.services.communication_layer import CommunicationLayer
 except ImportError:
     CommunicationLayer = None  # type: ignore[misc,assignment]
 
@@ -112,20 +113,19 @@ class CoordinatorAgent:
         self.rng = np.random.RandomState(seed)
 
         # --- subsystems --------------------------------------------------
-        # ASSUMPTION: constructor signatures match.
-        self.gnn_coordinator = GNNCoordinator(
+        topology_graph = create_grid_graph(
             num_households=num_households,
             num_solar_panels=num_solar_panels,
             num_wind_turbines=num_wind_turbines,
+        )
+
+        self.gnn_coordinator = GNNCoordinator(
+            graph=topology_graph,
+            seed=seed or 42,
             log_dir=log_dir,
         )
 
-        self.market_model = MarketModel(
-            num_households=num_households,
-            num_solar_panels=num_solar_panels,
-            num_wind_turbines=num_wind_turbines,
-            log_dir=log_dir,
-        )
+        self.market_model = MarketModel()
 
         # Communication layer is optional — avoids coupling the
         # simulation loop to TCP infrastructure when it is not needed.
@@ -189,11 +189,18 @@ class CoordinatorAgent:
             # ASSUMPTION: returns dict with keys grid_balance,
             # market_balance, household_consumption, solar_production,
             # wind_production.
-            market_data: Dict[str, Any] = self.market_model.step(
-                households=households,
-                solar=solar,
-                wind=wind,
-            )
+            try:
+                market_data: Dict[str, Any] = self.market_model.step(
+                    households=households,
+                    solar=solar,
+                    wind=wind,
+                )
+            except NotImplementedError:
+                market_data = self._fallback_market_step(
+                    households=households,
+                    solar=solar,
+                    wind=wind,
+                )
 
             # --- rule-based decision -------------------------------------
             state = self._market_data_to_state(market_data)
@@ -322,6 +329,25 @@ class CoordinatorAgent:
     # ==================================================================
     # Internal helpers
     # ==================================================================
+
+    @staticmethod
+    def _fallback_market_step(
+        households: List[Dict[str, float]],
+        solar: float,
+        wind: float,
+    ) -> Dict[str, float]:
+        """Temporary market snapshot used while MarketModel remains a stub."""
+        household_consumption = float(
+            sum(h.get("consumption", 0.0) for h in households)
+        )
+        generation = float(solar + wind)
+        return {
+            "grid_balance": generation - household_consumption,
+            "market_balance": generation - household_consumption,
+            "household_consumption": household_consumption,
+            "solar_production": solar,
+            "wind_production": wind,
+        }
 
     @staticmethod
     def _market_data_to_state(

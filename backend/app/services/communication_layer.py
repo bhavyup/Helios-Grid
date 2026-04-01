@@ -12,7 +12,7 @@ Recommended location: ``infra/communication.py`` or ``services/comm_layer.py``
 If this file currently lives at ``envs/house_env.py``, it will block
 ``grid_env.py``, which expects::
 
-    from envs.house_env import HouseEnv
+    from app.envs.house_env import HouseEnv
 
 This is a P0 import-crash blocker.  Move this file before running
 the simulation.
@@ -36,9 +36,10 @@ from datetime import datetime
 # The *original* file used bare imports (``from logging_utils import …``),
 # which is inconsistent with the rest of the project.
 # Adjust to match your actual layout.
-from config import config
-from utils.logging_utils import log_simulation_data, log_training_data
-from models.gnn_coordinator import GNNCoordinator
+from app.core.project_config import config
+from app.models.gnn_coordinator import GNNCoordinator
+from app.utils.graph_utils import create_grid_graph
+from app.utils.logging_utils import log_simulation_data, log_training_data
 
 logger = logging.getLogger(__name__)
 
@@ -212,8 +213,15 @@ class CommunicationLayer:
         full duration of training.  All other queued messages stall.
         """
         if self._gnn_coordinator is None:
-            # ASSUMPTION: GNNCoordinator() accepts zero arguments.
-            self._gnn_coordinator = GNNCoordinator()
+            default_graph = create_grid_graph(
+                num_households=int(config.get("num_households", 10)),
+                num_solar_panels=int(config.get("num_solar_panels", 5)),
+                num_wind_turbines=int(config.get("num_wind_turbines", 3)),
+            )
+            self._gnn_coordinator = GNNCoordinator(
+                graph=default_graph,
+                log_dir=config.LOG_DIR,
+            )
 
         self._gnn_coordinator.run(
             num_epochs=message.get("epochs", 100)

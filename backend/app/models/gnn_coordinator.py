@@ -9,9 +9,9 @@ import torch.nn as nn
 import torch.optim as optim
 import networkx as nx
 
-from utils.graph_utils import create_grid_graph, get_node_types, get_edges
-from utils.logging_utils import log_training_data, log_simulation_data
-from config import config
+from app.core.project_config import config
+from app.utils.graph_utils import get_edges, get_node_types
+from app.utils.logging_utils import log_simulation_data, log_training_data
 
 logger = logging.getLogger(__name__)
 

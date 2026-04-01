@@ -29,7 +29,7 @@ from typing import Any, Dict, List
 import numpy as np
 import pandas as pd
 
-from config import config
+from app.core.project_config import config
 
 logger = logging.getLogger(__name__)
 

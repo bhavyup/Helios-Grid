@@ -293,7 +293,7 @@ def log_env_info(
 
     This function exists because ``grid_env.py`` imports::
 
-        from utils.logging_utils import log_env_info
+        from app.utils.logging_utils import log_env_info
 
     Args:
         episode: Episode number.

@@ -39,7 +39,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from envs.house_env import HouseEnv
+from app.envs.house_env import HouseEnv
 
 
 # ===========================================================================
@@ -119,12 +119,12 @@ class TestConstruction:
 
     def test_import_resolves(self):
         """
-        ``from envs.house_env import HouseEnv`` must succeed.
+        ``from app.envs.house_env import HouseEnv`` must succeed.
 
         If this fails, CommunicationLayer likely still occupies the
         module slot.
         """
-        from envs.house_env import HouseEnv as _H
+        from app.envs.house_env import HouseEnv as _H
         assert _H is not None
 
     def test_zero_arg_construction(self):

@@ -1,17 +1,17 @@
 import numpy as np
 from typing import Dict, List, Tuple, Any
 
-from gym import Env
-from gym.spaces import Dict as GymDict, Box, Discrete
-from gym.utils import seeding
+from gymnasium import Env
+from gymnasium.spaces import Dict as GymDict, Box, Discrete
+from gymnasium.utils import seeding
 
-from envs.house_env import HouseEnv
-from models.gnn_coordinator import GNNCoordinator
-from utils.graph_utils import build_grid_graph
-from utils.data_utils import load_weather_data
-from utils.reward_utils import compute_grid_reward
-from utils.logging_utils import log_env_info
-from config import config
+from app.core.project_config import config
+from app.envs.house_env import HouseEnv
+from app.models.gnn_coordinator import GNNCoordinator
+from app.utils.data_utils import load_weather_data
+from app.utils.graph_utils import build_grid_graph
+from app.utils.logging_utils import log_env_info
+from app.utils.reward_utils import compute_grid_reward
 
 
 class GridEnv(Env):
@@ -19,6 +19,8 @@ class GridEnv(Env):
     Top-level grid environment that orchestrates household sub-environments,
     a GNN coordinator, weather data, and market actions.
     """
+
+    metadata = {"render_modes": ["human"]}
 
     def __init__(
         self,
@@ -172,8 +174,15 @@ class GridEnv(Env):
         # --- reward -------------------------------------------------------
         market_reward = 0.0
         if market_actions == 1:
+            extracted_states = [
+                self._extract_house_state(result)
+                for result in house_step_results
+            ]
+            demand = float(sum(state[1] for state in extracted_states))
+            supply = float(sum(state[2] for state in extracted_states))
+            avg_price = float(np.mean([state[4] for state in extracted_states]))
             market_reward = float(
-                compute_grid_reward(self.house_environments, self.graph)
+                compute_grid_reward(supply=supply, demand=demand, price=avg_price)
             )
 
         step_reward = market_reward
@@ -221,6 +230,13 @@ class GridEnv(Env):
             "grid_state": self._get_grid_state(),
             "market_state": self._get_market_state(),
         }
+
+    @staticmethod
+    def _extract_house_state(step_result: Any) -> np.ndarray:
+        """Normalize a house step result into a (10,) float32 state vector."""
+        if isinstance(step_result, tuple):
+            step_result = step_result[0]
+        return np.asarray(step_result, dtype=np.float32)
 
     def _get_grid_state(self) -> np.ndarray:
         """
