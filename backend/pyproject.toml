@@ -15,7 +15,8 @@ dependencies = [
     "pydantic-settings>=2.4.0",
     "numpy>=1.26.0",
     "networkx>=3.3",
-    "orjson>=3.10.0"
+    "orjson>=3.10.0",
+    "seaborn>=0.13.2"
 ]
 
 [project.optional-dependencies]

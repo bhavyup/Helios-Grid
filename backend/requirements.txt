@@ -3,7 +3,7 @@ pandas
 torch
 gymnasium
 matplotlib
-seaborn
+seaborn>=0.13.2
 scikit-learn
 tqdm
 networkx
