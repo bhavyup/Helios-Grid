@@ -1,0 +1,20 @@
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Local virtual environments
+backend/.venv/
+.venv/
+
+# Setuptools metadata (generated)
+backend/*.egg-info/
+
+# Local environment files
+.env
+backend/.env
+
+# Runtime logs
+logs/
+backend/logs/

@@ -1,10 +1,10 @@
 numpy
 pandas
 torch
-gymnasium
 matplotlib
 scikit-learn
 tqdm
-pyyaml
-infra
-logging_utils
+pyinfra
+loggingutil
+pyyaml>=6.0.2
+gymnasium>=0.29.1

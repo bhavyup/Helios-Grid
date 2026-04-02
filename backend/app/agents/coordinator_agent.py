@@ -119,13 +119,25 @@ class CoordinatorAgent:
             num_wind_turbines=num_wind_turbines,
         )
 
-        self.gnn_coordinator = GNNCoordinator(
-            graph=topology_graph,
-            seed=seed or 42,
-            log_dir=log_dir,
-        )
+        gnn_kwargs: Dict[str, Any] = {
+            "graph": topology_graph,
+            "log_dir": log_dir,
+        }
+        if seed is not None:
+            gnn_kwargs["seed"] = seed
+        self.gnn_coordinator = GNNCoordinator(**gnn_kwargs)
 
-        self.market_model = MarketModel()
+        # Support both old and new MarketModel constructor signatures.
+        market_kwargs: Dict[str, Any] = {
+            "num_households": num_households,
+            "num_solar_panels": num_solar_panels,
+            "num_wind_turbines": num_wind_turbines,
+            "log_dir": log_dir,
+        }
+        try:
+            self.market_model = MarketModel(**market_kwargs)
+        except TypeError:
+            self.market_model = MarketModel()
 
         # Communication layer is optional — avoids coupling the
         # simulation loop to TCP infrastructure when it is not needed.
@@ -148,10 +160,10 @@ class CoordinatorAgent:
         """
         self.running = True
 
-        if self._comm_layer is not None:
-            self._comm_layer.start()
-
         try:
+            if self._comm_layer is not None:
+                self._comm_layer.start()
+
             # GNN trains to completion before simulation.  If
             # interleaved training is required, restructure later.
             self.gnn_coordinator.run(num_epochs=num_epochs)
@@ -215,25 +227,22 @@ class CoordinatorAgent:
             # simulation-clock value (e.g. step index).
             timestamp = datetime.now(tz=timezone.utc).isoformat()
 
-            # --- authoritative log (direct call) -------------------------
-            log_simulation_data(
-                log_dir=self.log_dir,
-                timestamp=timestamp,
-                grid_balance=market_data.get("grid_balance", 0.0),
-                market_balance=market_data.get("market_balance", 0.0),
-                household_consumption=market_data.get(
-                    "household_consumption", 0.0
-                ),
-                solar_production=market_data.get("solar_production", 0.0),
-                wind_production=market_data.get("wind_production", 0.0),
-            )
-
-            # --- forward to communication layer (if present) -------------
-            # NOTE: if the comm layer's internal message handler also
-            # calls log_simulation_data for "grid" messages, this will
-            # produce duplicate log entries.  The direct call above is
-            # the authoritative record.
-            if self._comm_layer is not None:
+            # --- authoritative logging path ------------------------------
+            # If comm layer is present, it owns persistence to avoid
+            # duplicate simulation records.
+            if self._comm_layer is None:
+                log_simulation_data(
+                    log_dir=self.log_dir,
+                    timestamp=timestamp,
+                    grid_balance=market_data.get("grid_balance", 0.0),
+                    market_balance=market_data.get("market_balance", 0.0),
+                    household_consumption=market_data.get(
+                        "household_consumption", 0.0
+                    ),
+                    solar_production=market_data.get("solar_production", 0.0),
+                    wind_production=market_data.get("wind_production", 0.0),
+                )
+            else:
                 self._comm_layer.send_message({
                     "component_type": "grid",
                     "timestamp": timestamp,
