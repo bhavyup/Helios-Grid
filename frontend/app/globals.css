@@ -1,0 +1,80 @@
+@import url("https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&family=Merriweather+Sans:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-0: #020617;
+  --bg-1: #0f172a;
+  --bg-2: #111827;
+  --panel: rgba(15, 23, 42, 0.74);
+  --stroke: rgba(148, 163, 184, 0.28);
+  --text: #e2e8f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background:
+    radial-gradient(1200px 560px at 0% -10%, rgba(14, 116, 144, 0.35), transparent 60%),
+    radial-gradient(900px 540px at 110% 20%, rgba(217, 119, 6, 0.28), transparent 58%),
+    linear-gradient(145deg, var(--bg-0), var(--bg-1) 42%, var(--bg-2));
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at center, black 20%, transparent 100%);
+}
+
+.panel-surface {
+  position: relative;
+  border: 1px solid var(--stroke);
+  border-radius: 1rem;
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgba(8, 15, 30, 0.45);
+  backdrop-filter: blur(6px);
+}
+
+.panel-title {
+  margin: 0;
+  font-family: "Exo 2", "Trebuchet MS", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f8fafc;
+}
+
+.command-badge {
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  color: #bae6fd;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.65);
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.7);
+}

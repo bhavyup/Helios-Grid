@@ -8,6 +8,7 @@ from gymnasium.utils import seeding
 from app.core.project_config import config
 from app.envs.house_env import HouseEnv
 from app.models.gnn_coordinator import GNNCoordinator
+from app.models.market_model import MarketModel
 from app.utils.data_utils import load_weather_data
 from app.utils.graph_utils import build_grid_graph
 from app.utils.logging_utils import log_env_info
@@ -66,6 +67,35 @@ class GridEnv(Env):
         # Initialize GNN coordinator
         self.gnn_coordinator = GNNCoordinator(self.graph)
 
+        market_cfg = config.get("market", {})
+        default_price = float(
+            market_cfg.get("default_price", 0.3)
+            if hasattr(market_cfg, "get")
+            else 0.3
+        )
+        price_min = float(
+            market_cfg.get("price_min", 0.1)
+            if hasattr(market_cfg, "get")
+            else 0.1
+        )
+        price_max = float(
+            market_cfg.get("price_max", 1.0)
+            if hasattr(market_cfg, "get")
+            else 1.0
+        )
+        self.market_model = MarketModel(
+            default_price=default_price,
+            price_min=price_min,
+            price_max=price_max,
+        )
+        self.last_market_snapshot = self.market_model.reset()
+        self.last_coordination_summary = {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+        }
+
         # ------------------------------------------------------------------
         # Action and observation spaces
         # ------------------------------------------------------------------
@@ -106,6 +136,16 @@ class GridEnv(Env):
     def seed(self, seed=None):
         """Seed all internal RNGs for reproducibility."""
         self.np_random, seed = seeding.np_random(seed)
+        # Gymnasium may return very large seed integers; normalize to keep
+        # downstream libraries (notably torch) in a safe integer range.
+        base_seed = int(seed) % (2**31 - 1)
+
+        for index, house in enumerate(self.house_environments):
+            house.seed(base_seed + index + 1)
+
+        if hasattr(self.gnn_coordinator, "seed_everything"):
+            self.gnn_coordinator.seed_everything(base_seed)
+
         return [seed]
 
     # ------------------------------------------------------------------
@@ -123,6 +163,13 @@ class GridEnv(Env):
             house.reset()
 
         self.gnn_coordinator.reset()
+        self.last_market_snapshot = self.market_model.reset()
+        self.last_coordination_summary = {
+            "mean": 0.0,
+            "std": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+        }
 
         return self._get_observation()
 
@@ -160,6 +207,11 @@ class GridEnv(Env):
             result = house.step(house_actions[i])
             house_step_results.append(result)
 
+        extracted_states = [
+            self._extract_house_state(result)
+            for result in house_step_results
+        ]
+
         # --- GNN coordination --------------------------------------------
         # TODO: coordination_signals are computed but not yet consumed.
         #       Wire into house sub-envs or include in observation when the
@@ -167,25 +219,30 @@ class GridEnv(Env):
         coordination_signals = self.gnn_coordinator.compute_coordination_signals(
             house_step_results, self.graph, self.weather_data[weather_idx]
         )
+        self.last_coordination_summary = self._summarize_coordination_signals(
+            coordination_signals
+        )
+
+        aggregate = self._aggregate_house_states(extracted_states)
+        self.last_market_snapshot = self.market_model.step(
+            supply=aggregate["supply"],
+            demand=aggregate["demand"],
+            market_action=int(market_actions),
+            solar=aggregate["supply"],
+            wind=0.0,
+        )
 
         # Advance time *after* consuming the current weather datum
         self.current_time += 1
 
         # --- reward -------------------------------------------------------
-        market_reward = 0.0
-        if market_actions == 1:
-            extracted_states = [
-                self._extract_house_state(result)
-                for result in house_step_results
-            ]
-            demand = float(sum(state[1] for state in extracted_states))
-            supply = float(sum(state[2] for state in extracted_states))
-            avg_price = float(np.mean([state[4] for state in extracted_states]))
-            market_reward = float(
-                compute_grid_reward(supply=supply, demand=demand, price=avg_price)
+        step_reward = float(
+            compute_grid_reward(
+                supply=float(self.last_market_snapshot["effective_supply"]),
+                demand=float(self.last_market_snapshot["effective_demand"]),
+                price=float(self.last_market_snapshot["clearing_price"]),
             )
-
-        step_reward = market_reward
+        )
         self.total_reward += step_reward
 
         # --- termination --------------------------------------------------
@@ -207,7 +264,8 @@ class GridEnv(Env):
             "step_reward": step_reward,
             "total_reward": self.total_reward,
             "weather_index_used": weather_idx,
-            "coordination_signals": coordination_signals,
+            "coordination_summary": self.last_coordination_summary,
+            "market_snapshot": self.last_market_snapshot,
         }
 
         return self._get_observation(), step_reward, done, info
@@ -245,11 +303,56 @@ class GridEnv(Env):
         Returns:
             np.ndarray of shape ``(num_households, 10)``
 
-        NOTE: placeholder — replace with actual grid-state computation.
+        Returns deterministic aggregate metrics derived from current
+        household states, repeated per household for backward compatibility
+        with the current observation space shape.
         """
-        return self.np_random.uniform(
-            size=(self.num_households, 10)
-        ).astype(np.float32)
+        if not self.house_environments:
+            return np.zeros((self.num_households, 10), dtype=np.float32)
+
+        house_states = np.asarray(
+            [house.get_state() for house in self.house_environments],
+            dtype=np.float32,
+        )
+        if house_states.size == 0:
+            return np.zeros((self.num_households, 10), dtype=np.float32)
+
+        total_energy = float(np.sum(house_states[:, 0]))
+        total_demand = float(np.sum(house_states[:, 1]))
+        total_supply = float(np.sum(house_states[:, 2]))
+        avg_battery = float(np.mean(house_states[:, 3]))
+        avg_price = float(np.mean(house_states[:, 4]))
+        total_grid_import = float(np.sum(house_states[:, 5]))
+        total_p2p_buy = float(np.sum(house_states[:, 6]))
+        total_p2p_sell = float(np.sum(house_states[:, 7]))
+        net_balance = float(np.sum(house_states[:, 9]))
+        renewable_utilization = 0.0
+        if total_demand > 0.0:
+            renewable_utilization = float(
+                np.clip(total_supply / total_demand, 0.0, 1.0)
+            )
+
+        timestep_norm = float(
+            min(self.current_time, self.max_episode_steps)
+            / max(self.max_episode_steps, 1)
+        )
+
+        aggregate_vector = np.array(
+            [
+                total_energy,
+                total_demand,
+                total_supply,
+                avg_battery,
+                avg_price,
+                total_grid_import,
+                total_p2p_buy,
+                total_p2p_sell,
+                timestep_norm,
+                net_balance + renewable_utilization,
+            ],
+            dtype=np.float32,
+        )
+        return np.tile(aggregate_vector, (self.num_households, 1))
 
     def _get_market_state(self) -> np.ndarray:
         """
@@ -258,11 +361,37 @@ class GridEnv(Env):
         Returns:
             np.ndarray of shape ``(num_households, 2)``
 
-        NOTE: placeholder — replace with actual market-state computation.
+        Returns deterministic market metrics repeated per household for
+        backward compatibility with current observation shape.
         """
-        return self.np_random.uniform(
-            size=(self.num_households, 2)
-        ).astype(np.float32)
+        price = float(self.last_market_snapshot.get("clearing_price", 0.0))
+        imbalance = float(self.last_market_snapshot.get("imbalance", 0.0))
+        market_vector = np.array([price, imbalance], dtype=np.float32)
+        return np.tile(market_vector, (self.num_households, 1))
+
+    @staticmethod
+    def _aggregate_house_states(house_states: List[np.ndarray]) -> Dict[str, float]:
+        if not house_states:
+            return {"demand": 0.0, "supply": 0.0}
+
+        states = np.asarray(house_states, dtype=np.float32)
+        return {
+            "demand": float(np.sum(states[:, 1])),
+            "supply": float(np.sum(states[:, 2])),
+        }
+
+    @staticmethod
+    def _summarize_coordination_signals(signals: Any) -> Dict[str, float]:
+        array = np.asarray(signals, dtype=np.float32)
+        if array.size == 0:
+            return {"mean": 0.0, "std": 0.0, "min": 0.0, "max": 0.0}
+
+        return {
+            "mean": float(np.mean(array)),
+            "std": float(np.std(array)),
+            "min": float(np.min(array)),
+            "max": float(np.max(array)),
+        }
 
     # ------------------------------------------------------------------
     # Rendering / lifecycle

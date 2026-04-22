@@ -18,3 +18,13 @@ backend/.env
 # Runtime logs
 logs/
 backend/logs/
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/tsconfig.tsbuildinfo
+tools/
+
+# Generated datasets
+data/csv/*.csv
