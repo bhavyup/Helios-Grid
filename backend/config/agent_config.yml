@@ -1,0 +1,180 @@
+# =============================================================
+# Helios-Grid — Canonical Configuration
+# =============================================================
+#
+# SCHEMA CONVENTIONS
+# ------------------
+# 1. All canonical keys use snake_case.
+# 2. Each value has ONE canonical location inside a named section.
+# 3. Top-level UPPER_CASE keys are COMPATIBILITY ALIASES only,
+#    retained because existing Python modules access them via
+#    attribute-style (config.LOG_DIR).  They MUST mirror the
+#    canonical value in their respective section.
+# 4. Top-level snake_case aliases are DEPRECATED duplicates,
+#    retained for backward compatibility with modules that do
+#    config['num_households'].  They MUST mirror the canonical
+#    value in their respective section.
+# 5. When updating a value, update the CANONICAL location first,
+#    then update every alias marked with "# ←── keep in sync".
+#
+# LOADER REQUIREMENT
+# ------------------
+# The Python config loader MUST support both:
+#   config['section']['key']   (dict-style, canonical)
+#   config.UPPER_KEY           (attribute-style, compat aliases)
+# This is UNVERIFIED — review config.py / loader next.
+#
+# =============================================================
+
+
+# =============================================================
+# 1. Reproducibility
+# =============================================================
+# All seeding across envs, agents, and models should read from
+# here.  Individual modules accept seed= parameters — wire them
+# to this value in the loader or orchestrator.
+
+reproducibility:
+  seed: 42
+
+
+# =============================================================
+# 2. Environment
+# =============================================================
+
+env:
+  num_households: 10          # household agents in the grid
+  max_episode_steps: 1000     # maximum timesteps per episode
+                              # NOTE: previously called "training_steps"
+                              # in this file and in grid_env.py.
+                              # Renamed for clarity: this is an episode-
+                              # length cap, NOT a training budget.
+  max_battery: 10             # per-household battery capacity (kWh)
+  time_step_hours: 1          # simulation resolution (hours)
+  action_dim: 6               # per-household action vector length
+  observation_dim: 10         # per-household observation vector length
+
+
+# =============================================================
+# 3. Data paths
+# =============================================================
+
+data_paths:
+  grid_topology: "data/grid_topology/sample_grid.json"
+  weather_data: "data/weather_data/sample_weather.csv"
+  household_data: "data/historical_energy_data/sample_consumption.csv"
+  market_data: "data/market_prices/sample_prices.csv"
+
+
+# =============================================================
+# 4. PPO hyperparameters  (single source of truth)
+# =============================================================
+# Both house_agent and any future PPO-based agent should
+# reference this section.  Do NOT duplicate these values
+# under agents.house_agent.
+
+ppo:
+  learning_rate: 3e-4         # canonical; was "lr" in some places
+  gamma: 0.99
+  clip_epsilon: 0.2
+  entropy_coef: 0.01          # canonical; was "ent_coef" in some places
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  epochs: 10
+  batch_size: 64
+
+
+# =============================================================
+# 5. Agent definitions
+# =============================================================
+
+agents:
+  house_agent:
+    # NOTE: type is "ppo" but no PPO training loop exists yet.
+    # This declares intent for the RL roadmap.  The current
+    # implementation is rule-based (linear price response).
+    type: "ppo"
+    # Hyperparameters are inherited from the ppo: section above.
+    # Do NOT duplicate learning_rate, gamma, etc. here.
+
+  coordinator_agent:
+    type: "gnn_coordinator"
+    learning_rate: 1e-3       # canonical GNN learning rate
+    hidden_dim: 64
+    log_dir: "logs/gnn"       # coordinator-specific log subdirectory
+
+
+# =============================================================
+# 6. Training / checkpointing
+# =============================================================
+
+training:
+  episodes: 1000              # total training episodes
+  steps_per_episode: 24       # timesteps the orchestrator runs per
+                              # episode in its own loop.
+                              # NOTE: this is DISTINCT from
+                              # env.max_episode_steps (1000), which is
+                              # the environment's internal horizon cap.
+                              # If the orchestrator loop is shorter than
+                              # the env cap, the env will not hit "done"
+                              # on its own — the orchestrator must call
+                              # reset().
+  save_interval: 50           # checkpoint every N episodes
+
+
+# =============================================================
+# 7. Market
+# =============================================================
+
+market:
+  default_price: 0.3
+  price_min: 0.1
+  price_max: 1.0
+  settlement: "immediate"     # valid values: "immediate"
+                              # (extend as market model matures)
+
+
+# =============================================================
+# 8. Logging
+# =============================================================
+
+logging:
+  log_dir: "logs"             # canonical project-wide log directory
+
+
+# =============================================================
+# 9. Debug / developer
+# =============================================================
+
+debug:
+  verbose: false
+  show_plots: false
+
+
+# =============================================================
+# COMPATIBILITY ALIASES — attribute-style (UPPER_CASE)
+# =============================================================
+# These exist ONLY because some modules do config.LOG_DIR or
+# config.GNN_LR.  They are NOT canonical.  Update the canonical
+# section first, then mirror here.
+#
+# TODO: migrate all Python modules to read from canonical
+#       sections, then delete these aliases.
+
+LOG_DIR: "logs"               # ←── keep in sync with logging.log_dir
+GNN_LR: 0.001                # ←── keep in sync with agents.coordinator_agent.learning_rate
+
+
+# =============================================================
+# COMPATIBILITY ALIASES — dict-style (snake_case, top-level)
+# =============================================================
+# These exist ONLY because some modules do config['num_households'].
+# They are NOT canonical.  Update the canonical section first,
+# then mirror here.
+#
+# DEPRECATED — migrate callers to config['env']['num_households']
+# etc., then delete these.
+
+num_households: 10            # ←── keep in sync with env.num_households
+training_steps: 1000          # ←── keep in sync with env.max_episode_steps
+max_battery: 10               # ←── keep in sync with env.max_battery

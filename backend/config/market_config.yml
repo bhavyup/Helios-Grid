@@ -1,0 +1,42 @@
+# =============================================================
+# Helios-Grid — Market Configuration
+# =============================================================
+#
+# ROLE
+# ----
+# Market-specific defaults and overrides.  This file layers on
+# top of (or replaces) the `market:` section in the base
+# `config.yml`, depending on the config loader's merge strategy
+# (UNVERIFIED).
+#
+# To be safe, this file contains ALL market keys — both those
+# shared with the base config and those unique to this file.
+# If the loader performs a shallow replace of the `market:` key,
+# no values are lost.
+#
+# NAMING CONVENTION
+# -----------------
+# All keys use snake_case.  No top-level aliases.
+#
+# =============================================================
+
+market:
+  # --- pricing ---------------------------------------------------
+  default_price: 0.3            # fallback price when no market
+                                # signal is available
+  price_min: 0.1                # floor for price calculations
+  price_max: 1.0                # ceiling for price calculations
+
+  # --- fees ------------------------------------------------------
+  market_fee: 0.01              # per-transaction fee (fraction)
+
+  # --- settlement ------------------------------------------------
+  # How trades are resolved each step.
+  # Valid values: "immediate"
+  # (extend as market model matures)
+  settlement: "immediate"
+
+  # --- auction mechanism -----------------------------------------
+  auction:
+    enabled: false              # toggle auction-based matching
+    interval_steps: 24          # steps between auction rounds

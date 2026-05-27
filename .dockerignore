@@ -1,0 +1,16 @@
+.git
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+backend/.coverage*
+backend/coverage*.txt
+backend/test_artifacts
+frontend/node_modules
+frontend/.next
+frontend/.turbo
+frontend/.eslintcache
+frontend/coverage
+*.log

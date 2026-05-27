@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: Helios-Grid
+    orgId: 1
+    folder: Helios-Grid
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

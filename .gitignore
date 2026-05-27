@@ -1,0 +1,30 @@
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+
+# Local virtual environments
+backend/.venv/
+.venv/
+
+# Setuptools metadata (generated)
+backend/*.egg-info/
+
+# Local environment files
+.env
+backend/.env
+
+# Runtime logs
+logs/
+backend/logs/
+
+# Frontend artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/tsconfig.tsbuildinfo
+tools/
+
+# Generated datasets
+data/csv/*.csv

@@ -1,0 +1,73 @@
+{
+  "uid": "helios-grid-overview",
+  "title": "Helios-Grid Monitoring",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "15s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "HTTP Latency",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(helios_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}} p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Training Jobs",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(helios_training_jobs_total[5m]))",
+          "legendFormat": "{{result}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Failures",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(helios_http_request_failures_total[5m]))",
+          "legendFormat": "HTTP failures"
+        },
+        {
+          "expr": "sum(rate(helios_errors_total[5m]))",
+          "legendFormat": "App errors"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU and GPU Usage",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "helios_system_cpu_percent",
+          "legendFormat": "CPU %"
+        },
+        {
+          "expr": "helios_system_memory_percent",
+          "legendFormat": "Memory %"
+        },
+        {
+          "expr": "helios_gpu_memory_used_mb",
+          "legendFormat": "GPU used MB"
+        },
+        {
+          "expr": "helios_gpu_available",
+          "legendFormat": "GPU available"
+        }
+      ]
+    }
+  ]
+}

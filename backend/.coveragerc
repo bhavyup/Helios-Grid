@@ -1,0 +1,25 @@
+[run]
+source = app
+omit =
+    app/agents/*
+    app/domain/*
+    app/models/*
+    app/utils/*
+    app/analytics/*
+    app/sim/*
+    app/tests/*
+    app/core/config.py
+    app/envs/market_env.py
+    app/infrastructure/communication_layer.py
+    app/infrastructure/data_utils.py
+    app/infrastructure/graph_utils.py
+    app/infrastructure/logging_utils.py
+    app/infrastructure/mlflow_tracker.py
+    app/infrastructure/model_registry.py
+    app/infrastructure/plot_utils.py
+    app/infrastructure/s3_client.py
+
+[report]
+show_missing = True
+skip_covered = False
+precision = 1
