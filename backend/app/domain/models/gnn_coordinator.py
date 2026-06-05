@@ -1,4 +1,3 @@
-
 import random
 import logging
 from datetime import datetime
@@ -92,7 +91,9 @@ class GNNCoordinator:
                     nn.Linear(hidden_dim, output_dim),
                 )
 
-            def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
+            def forward(
+                self, x: torch.Tensor, edge_index: torch.Tensor
+            ) -> torch.Tensor:
                 """
                 Forward pass for the placeholder GNN.
 
@@ -108,9 +109,9 @@ class GNNCoordinator:
                 # e.g., `x = self.conv1(x, edge_index)`
                 return self.layers(x)
 
-        # Current node features are type IDs, which are floats (1.0, 2.0, 3.0),
-        # so input_dim=1. Output target is also the type ID, so output_dim=1.
-        input_dim = 1
+        # Current node features are type IDs, which are floats (1.0, 2.0, 3.0).
+        # We augment with a global weather scalar (e.g., pv_power), so input_dim=2.
+        input_dim = 2
         output_dim = 1
         hidden_dim = 64  # Arbitrary hidden dimension for the placeholder MLP
 
@@ -126,17 +127,21 @@ class GNNCoordinator:
         # Ensure mapping to contiguous 0-indexed IDs is used
         sorted_nodes = [self.idx_to_node[i] for i in range(len(self.graph.nodes))]
 
-        node_type_ids = torch.tensor(
-            [
-                1.0
-                if node_types[node] == "household"
-                else 2.0
-                if node_types[node] == "solar"
-                else 3.0
-                for node in sorted_nodes
-            ],
-            dtype=torch.float32,
-        ).unsqueeze(1).to(self.device)
+        node_type_ids = (
+            torch.tensor(
+                [
+                    (
+                        1.0
+                        if node_types[node] == "household"
+                        else 2.0 if node_types[node] == "solar" else 3.0
+                    )
+                    for node in sorted_nodes
+                ],
+                dtype=torch.float32,
+            )
+            .unsqueeze(1)
+            .to(self.device)
+        )
         return node_type_ids
 
     # NOTE: _get_edge_features is currently unused by _build_model
@@ -149,7 +154,9 @@ class GNNCoordinator:
         This method is currently not used by the placeholder GNN model.
         """
         edges = get_edges(self.graph)
-        edge_weights = torch.tensor([e[2] for e in edges], dtype=torch.float32).unsqueeze(1)
+        edge_weights = torch.tensor(
+            [e[2] for e in edges], dtype=torch.float32
+        ).unsqueeze(1)
         return edge_weights.to(self.device)
 
     def _get_graph_data(self) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -196,9 +203,33 @@ class GNNCoordinator:
         self.model.eval()  # Set model to evaluation mode
         with torch.no_grad():
             x, edge_index = self._get_graph_data()
+
+            # augment node features with a global weather scalar (pv_power preferred)
+            try:
+                weather_scalar = float(
+                    weather_data.get(
+                        "pv_power", weather_data.get("solar_irradiance", 0.0)
+                    )
+                )
+            except Exception:
+                weather_scalar = 0.0
+
+            num_nodes = x.shape[0]
+            weather_tensor = torch.full(
+                (num_nodes, 1), float(weather_scalar), dtype=torch.float32
+            ).to(self.device)
+            if x.shape[1] == 1:
+                x = torch.cat([x, weather_tensor], dim=1)
+            else:
+                # if x already contains additional features, replace the second column with weather
+                x[:, 1:2] = weather_tensor
+
             output = self.model(x, edge_index)
 
-        logger.debug("Computed coordination signals (placeholder output mean: %.4f)", output.mean().item())
+        logger.debug(
+            "Computed coordination signals (placeholder output mean: %.4f)",
+            output.mean().item(),
+        )
         return output.cpu().numpy()  # Return numpy array for compatibility
 
     def train(self, num_epochs: int = 100) -> None:
@@ -212,7 +243,9 @@ class GNNCoordinator:
             self.model.train()
             self.optimizer.zero_grad()
             output = self.model(x, edge_index)
-            loss = self.criterion(output, x)  # Placeholder: model learns to reconstruct its input
+            loss = self.criterion(
+                output, x
+            )  # Placeholder: model learns to reconstruct its input
 
             loss.backward()
             self.optimizer.step()
@@ -220,7 +253,9 @@ class GNNCoordinator:
             if (epoch + 1) % 10 == 0 or epoch == num_epochs - 1:
                 logger.info(
                     "GNN Train - Epoch %d/%d, Loss: %.4f",
-                    epoch + 1, num_epochs, loss.item()
+                    epoch + 1,
+                    num_epochs,
+                    loss.item(),
                 )
 
             log_training_data(
@@ -244,7 +279,11 @@ class GNNCoordinator:
 
         log_simulation_data(
             log_dir=self.log_dir,
-            timestamp="2023-01-01T00:00:00" if self.seed is not None else datetime.now().isoformat(),
+            timestamp=(
+                "2023-01-01T00:00:00"
+                if self.seed is not None
+                else datetime.now().isoformat()
+            ),
             grid_balance=output.mean().item(),
             market_balance=output.mean().item(),
             household_consumption=output.mean().item(),

@@ -6,6 +6,15 @@ scikit-learn
 tqdm
 pyinfra
 loggingutil
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+python-multipart>=0.0.9
+python-jose[cryptography]>=3.3.0
+passlib>=1.7.4
+networkx>=3.3
+orjson>=3.10.0
 pyyaml>=6.0.2
 gymnasium>=0.29.1
 SQLAlchemy>=2.0.30

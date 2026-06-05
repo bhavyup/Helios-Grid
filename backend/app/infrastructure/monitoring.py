@@ -6,7 +6,13 @@ from typing import Any, Callable, TypeVar
 
 import psutil
 import torch
-from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -103,12 +109,18 @@ def _status_bucket(status_code: int) -> str:
     return "5xx"
 
 
-def observe_request(method: str, route: str, status_code: int, duration_seconds: float) -> None:
+def observe_request(
+    method: str, route: str, status_code: int, duration_seconds: float
+) -> None:
     status = _status_bucket(status_code)
-    HTTP_REQUEST_DURATION_SECONDS.labels(method=method, route=route, status=status).observe(duration_seconds)
+    HTTP_REQUEST_DURATION_SECONDS.labels(
+        method=method, route=route, status=status
+    ).observe(duration_seconds)
     HTTP_REQUESTS_TOTAL.labels(method=method, route=route, status=status).inc()
     if status_code >= 400:
-        HTTP_REQUEST_FAILURES_TOTAL.labels(method=method, route=route, status=status).inc()
+        HTTP_REQUEST_FAILURES_TOTAL.labels(
+            method=method, route=route, status=status
+        ).inc()
 
 
 def record_error(subsystem: str, error_type: str) -> None:
@@ -123,8 +135,21 @@ def record_training_job_completed(training_summary: dict[str, Any]) -> None:
     TRAINING_JOBS_TOTAL.labels(result="completed").inc()
     reward_curve = training_summary.get("reward_curve") or []
     if reward_curve:
-        TRAINING_REWARD_LAST.set(float(reward_curve[-1]))
-        TRAINING_REWARD_MEAN.set(float(sum(reward_curve) / len(reward_curve)))
+        # Support reward_curve as list of numbers or list of dicts with a 'reward' key
+        numeric_rewards: list[float] = []
+        for item in reward_curve:
+            if isinstance(item, dict):
+                val = item.get("reward")
+            else:
+                val = item
+            try:
+                numeric_rewards.append(float(val))
+            except Exception:
+                continue
+
+        if numeric_rewards:
+            TRAINING_REWARD_LAST.set(float(numeric_rewards[-1]))
+            TRAINING_REWARD_MEAN.set(float(sum(numeric_rewards) / len(numeric_rewards)))
     episodes = training_summary.get("episodes")
     if episodes is not None:
         TRAINING_EPISODES.set(float(episodes))
@@ -168,7 +193,9 @@ def metrics_response() -> Response:
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
-async def record_http_metrics(request: Request, call_next: Callable[[Request], Any]) -> Response:
+async def record_http_metrics(
+    request: Request, call_next: Callable[[Request], Any]
+) -> Response:
     start = time.perf_counter()
     route_name = _route_name(request)
     method = request.method

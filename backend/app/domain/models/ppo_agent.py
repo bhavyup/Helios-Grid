@@ -19,6 +19,7 @@ from torch.distributions import Normal
 from app.core.project_config import config
 from app.domain.rewards.reward_utils import compute_house_reward
 from app.envs.house_env import HouseEnv
+from app.infrastructure.data_utils import get_data_paths, load_weather_data
 
 
 @dataclass
@@ -46,7 +47,9 @@ class _ActorCritic(nn.Module):
         self.critic = nn.Linear(hidden_dim, 1)
         self.log_std = nn.Parameter(torch.full((action_dim,), -0.5))
 
-    def forward(self, states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(
+        self, states: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         features = self.backbone(states)
         means = self.actor_mean(features)
         values = self.critic(features).squeeze(-1)
@@ -64,6 +67,7 @@ class _HouseEnvVectorAdapter(Env):
         max_episode_steps: int,
         max_battery: float,
         base_price: float,
+        weather_file: str,
     ) -> None:
         super().__init__()
         self._env = HouseEnv(
@@ -76,6 +80,13 @@ class _HouseEnvVectorAdapter(Env):
         self._max_steps = max(1, int(max_episode_steps))
         self._step_count = 0
         self._max_battery = float(max_battery)
+        self._weather_data = load_weather_data(weather_file)
+
+    def _weather_row(self) -> object | None:
+        if len(self._weather_data) == 0:
+            return None
+        idx = min(self._step_count, len(self._weather_data) - 1)
+        return self._weather_data[idx]
 
     def seed(self, seed=None):
         return self._env.seed(seed)
@@ -84,11 +95,17 @@ class _HouseEnvVectorAdapter(Env):
         if seed is not None:
             self._env.seed(seed)
         self._step_count = 0
+        weather_row = self._weather_row()
+        if weather_row is not None:
+            setattr(self._env, "current_weather", weather_row)
         obs = self._env.reset()
         info: Dict[str, object] = {}
         return obs, info
 
     def step(self, action):
+        weather_row = self._weather_row()
+        if weather_row is not None:
+            setattr(self._env, "current_weather", weather_row)
         obs = self._env.step(action)
         reward = float(
             compute_house_reward(
@@ -146,18 +163,31 @@ class PPOAgent:
             self._resolve_value(max_grad_norm, "max_grad_norm", "max_grad_norm", 0.5)
         )
         self.ppo_epochs = int(self._resolve_value(ppo_epochs, "epochs", "epochs", 8))
-        self.batch_size = int(self._resolve_value(batch_size, "batch_size", "batch_size", 64))
+        self.batch_size = int(
+            self._resolve_value(batch_size, "batch_size", "batch_size", 64)
+        )
         self.hidden_dim = int(hidden_dim)
 
         self.seed = self._resolve_seed(seed)
-        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self.device = torch.device(
+            device or ("cuda" if torch.cuda.is_available() else "cpu")
+        )
+        self.weather_data = load_weather_data(get_data_paths()["weather_data"])
+        self.weather_feature_names = [
+            "solar_irradiance",
+            "wind_speed",
+            "temperature",
+            "humidity",
+        ]
 
         self.model = _ActorCritic(
             obs_dim=self.obs_dim,
             action_dim=self.action_dim,
             hidden_dim=self.hidden_dim,
         ).to(self.device)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(), lr=self.learning_rate
+        )
 
         self._latest_training_summary: Dict[str, object] = {}
 
@@ -195,7 +225,10 @@ class PPOAgent:
                 episode_reward = 0.0
 
                 for step in range(steps_per_episode):
-                    state_tensor = self._state_tensor(state)
+                    weather_row = self._weather_row(step)
+                    self._attach_weather(env, weather_row)
+                    model_state = self._augment_state_with_weather(state, weather_row)
+                    state_tensor = self._state_tensor(model_state)
                     with torch.no_grad():
                         mean, std, value = self.model(state_tensor)
                         dist = Normal(mean, std)
@@ -215,7 +248,7 @@ class PPOAgent:
 
                     transitions.append(
                         _Transition(
-                            state=np.asarray(state, dtype=np.float32),
+                            state=np.asarray(model_state, dtype=np.float32),
                             raw_action=raw_action.squeeze(0)
                             .cpu()
                             .numpy()
@@ -230,8 +263,11 @@ class PPOAgent:
                     state = next_state
                     episode_reward += reward
 
+                last_model_state = self._augment_state_with_weather(
+                    state, self._weather_row(steps_per_episode)
+                )
                 loss_stats = self._update_policy(
-                    transitions=transitions, last_state=state
+                    transitions=transitions, last_state=last_model_state
                 )
                 moving_avg = self._moving_average(
                     [item["reward"] for item in reward_curve] + [episode_reward],
@@ -267,7 +303,11 @@ class PPOAgent:
                     dones_buffer: List[np.ndarray] = []
 
                     for _ in range(steps_per_episode):
-                        state_tensor = self._state_tensor(state)
+                        weather_row = self._weather_row(len(states_buffer))
+                        augmented_state = self._augment_state_batch_with_weather(
+                            state, weather_row
+                        )
+                        state_tensor = self._state_tensor(augmented_state)
                         with torch.no_grad():
                             mean, std, value = self.model(state_tensor)
                             dist = Normal(mean, std)
@@ -283,7 +323,9 @@ class PPOAgent:
                         next_state, reward, terminated, truncated, _ = env.step(action)
                         done = np.logical_or(terminated, truncated).astype(np.float32)
 
-                        states_buffer.append(np.asarray(state, dtype=np.float32))
+                        states_buffer.append(
+                            np.asarray(augmented_state, dtype=np.float32)
+                        )
                         raw_actions_buffer.append(
                             raw_action.detach().cpu().numpy().astype(np.float32)
                         )
@@ -299,6 +341,9 @@ class PPOAgent:
                         episode_rewards += np.asarray(reward, dtype=np.float32)
                         state = next_state
 
+                    last_augmented_state = self._augment_state_batch_with_weather(
+                        state, self._weather_row(steps_per_episode)
+                    )
                     loss_stats = self._update_policy_vectorized(
                         states=np.stack(states_buffer, axis=0),
                         raw_actions=np.stack(raw_actions_buffer, axis=0),
@@ -306,7 +351,7 @@ class PPOAgent:
                         values=np.stack(values_buffer, axis=0),
                         rewards=np.stack(rewards_buffer, axis=0),
                         dones=np.stack(dones_buffer, axis=0),
-                        last_state=state,
+                        last_state=last_augmented_state,
                     )
                     episode_reward = float(np.mean(episode_rewards))
                     moving_avg = self._moving_average(
@@ -352,14 +397,16 @@ class PPOAgent:
 
     def predict(self, state: np.ndarray, deterministic: bool = True) -> np.ndarray:
         """Return an action vector in [0, 1] for the provided state."""
-        state_tensor = self._state_tensor(state)
+        state_tensor = self._state_tensor(self._augment_state_with_weather(state, None))
         with torch.no_grad():
             mean, std, _ = self.model(state_tensor)
             if deterministic:
                 raw_action = mean
             else:
                 raw_action = Normal(mean, std).sample()
-            action = torch.sigmoid(raw_action).squeeze(0).cpu().numpy().astype(np.float32)
+            action = (
+                torch.sigmoid(raw_action).squeeze(0).cpu().numpy().astype(np.float32)
+            )
         return np.clip(action, 0.0, 1.0)
 
     def evaluate(
@@ -388,10 +435,13 @@ class PPOAgent:
 
             state = env.reset()
             for _ in range(steps_per_episode):
+                weather_row = self._weather_row(total_steps)
+                self._attach_weather(env, weather_row)
+                model_state = self._augment_state_with_weather(state, weather_row)
                 if policy_mode == "ppo":
-                    action = self.predict(state, deterministic=True)
+                    action = self.predict(model_state, deterministic=True)
                 elif policy_mode == "rule":
-                    action = self._rule_action(state)
+                    action = self._rule_action(model_state)
                 else:
                     raise ValueError(f"Unsupported policy_mode: {policy_mode}")
 
@@ -439,11 +489,15 @@ class PPOAgent:
         )
 
         deltas = {
-            "reward_delta": float(ppo_metrics["average_reward"] - rule_metrics["average_reward"]),
+            "reward_delta": float(
+                ppo_metrics["average_reward"] - rule_metrics["average_reward"]
+            ),
             "grid_import_delta": float(
                 ppo_metrics["average_grid_import"] - rule_metrics["average_grid_import"]
             ),
-            "price_delta": float(ppo_metrics["average_price"] - rule_metrics["average_price"]),
+            "price_delta": float(
+                ppo_metrics["average_price"] - rule_metrics["average_price"]
+            ),
         }
 
         return {
@@ -495,7 +549,9 @@ class PPOAgent:
         )
 
         returns = torch.as_tensor(returns_np, dtype=torch.float32, device=self.device)
-        advantages = torch.as_tensor(advantages_np, dtype=torch.float32, device=self.device)
+        advantages = torch.as_tensor(
+            advantages_np, dtype=torch.float32, device=self.device
+        )
 
         batch_size = min(self.batch_size, len(transitions))
         policy_losses: List[float] = []
@@ -514,15 +570,22 @@ class PPOAgent:
 
                 ratio = torch.exp(new_log_probs - old_log_probs[batch_indices])
                 unclipped = ratio * advantages[batch_indices]
-                clipped = torch.clamp(
-                    ratio,
-                    1.0 - self.clip_epsilon,
-                    1.0 + self.clip_epsilon,
-                ) * advantages[batch_indices]
+                clipped = (
+                    torch.clamp(
+                        ratio,
+                        1.0 - self.clip_epsilon,
+                        1.0 + self.clip_epsilon,
+                    )
+                    * advantages[batch_indices]
+                )
                 policy_loss = -torch.min(unclipped, clipped).mean()
                 value_loss = F.mse_loss(value_preds, returns[batch_indices])
 
-                loss = policy_loss + (self.vf_coef * value_loss) - (self.entropy_coef * entropy)
+                loss = (
+                    policy_loss
+                    + (self.vf_coef * value_loss)
+                    - (self.entropy_coef * entropy)
+                )
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -571,9 +634,7 @@ class PPOAgent:
 
         with torch.no_grad():
             _, _, last_values_tensor = self.model(self._state_tensor(last_state))
-            last_values = (
-                last_values_tensor.detach().cpu().numpy().astype(np.float32)
-            )
+            last_values = last_values_tensor.detach().cpu().numpy().astype(np.float32)
 
         returns_np, advantages_np = self._compute_gae_vectorized(
             rewards=rewards.reshape(steps, num_envs),
@@ -606,16 +667,21 @@ class PPOAgent:
 
                 means, std, value_preds = self.model(states_tensor[batch_indices])
                 dist = Normal(means, std)
-                new_log_probs = dist.log_prob(raw_actions_tensor[batch_indices]).sum(dim=-1)
+                new_log_probs = dist.log_prob(raw_actions_tensor[batch_indices]).sum(
+                    dim=-1
+                )
                 entropy = dist.entropy().sum(dim=-1).mean()
 
                 ratio = torch.exp(new_log_probs - old_log_probs[batch_indices])
                 unclipped = ratio * advantages[batch_indices]
-                clipped = torch.clamp(
-                    ratio,
-                    1.0 - self.clip_epsilon,
-                    1.0 + self.clip_epsilon,
-                ) * advantages[batch_indices]
+                clipped = (
+                    torch.clamp(
+                        ratio,
+                        1.0 - self.clip_epsilon,
+                        1.0 + self.clip_epsilon,
+                    )
+                    * advantages[batch_indices]
+                )
                 policy_loss = -torch.min(unclipped, clipped).mean()
                 value_loss = F.mse_loss(value_preds, returns[batch_indices])
 
@@ -657,7 +723,11 @@ class PPOAgent:
                 next_value = float(values[timestep + 1])
 
             mask = 1.0 - float(dones[timestep])
-            delta = float(rewards[timestep]) + (self.gamma * next_value * mask) - float(values[timestep])
+            delta = (
+                float(rewards[timestep])
+                + (self.gamma * next_value * mask)
+                - float(values[timestep])
+            )
             gae = delta + (self.gamma * self.gae_lambda * mask * gae)
             advantages[timestep] = gae
 
@@ -682,7 +752,9 @@ class PPOAgent:
                 next_values = values[timestep + 1]
 
             mask = 1.0 - dones[timestep]
-            delta = rewards[timestep] + (self.gamma * next_values * mask) - values[timestep]
+            delta = (
+                rewards[timestep] + (self.gamma * next_values * mask) - values[timestep]
+            )
             gae = delta + (self.gamma * self.gae_lambda * mask * gae)
             advantages[timestep] = gae
 
@@ -711,10 +783,61 @@ class PPOAgent:
                 max_episode_steps=steps_per_episode,
                 max_battery=max_battery,
                 base_price=base_price,
+                weather_file=get_data_paths()["weather_data"],
             )
             for _ in range(num_envs)
         ]
         return AsyncVectorEnv(env_fns)
+
+    def _weather_row(self, step_index: int) -> object | None:
+        if len(self.weather_data) == 0:
+            return None
+        idx = min(max(step_index, 0), len(self.weather_data) - 1)
+        return self.weather_data[idx]
+
+    def _attach_weather(self, env: HouseEnv, weather_row: object | None) -> None:
+        if weather_row is None:
+            return
+        try:
+            setattr(env, "current_weather", weather_row)
+        except Exception:
+            pass
+
+    def _weather_features(self, weather_row: object | None) -> np.ndarray:
+        features = np.zeros(4, dtype=np.float32)
+        if weather_row is None:
+            return features
+
+        try:
+            getter = getattr(weather_row, "get", None)
+            if callable(getter):
+                features[0] = float(getter("solar_irradiance", 0.0) or 0.0)
+                features[1] = float(getter("wind_speed", 0.0) or 0.0)
+                features[2] = float(getter("temperature", 20.0) or 20.0)
+                features[3] = float(getter("humidity", 50.0) or 50.0)
+        except Exception:
+            return features
+        return features
+
+    def _augment_state_with_weather(
+        self, state: np.ndarray, weather_row: object | None
+    ) -> np.ndarray:
+        state_array = np.asarray(state, dtype=np.float32).reshape(-1)
+        return np.concatenate(
+            [state_array, self._weather_features(weather_row)]
+        ).astype(np.float32)
+
+    def _augment_state_batch_with_weather(
+        self,
+        state: np.ndarray,
+        weather_row: object | None,
+    ) -> np.ndarray:
+        state_array = np.asarray(state, dtype=np.float32)
+        weather_features = self._weather_features(weather_row)
+        weather_block = np.tile(weather_features, (state_array.shape[0], 1)).astype(
+            np.float32
+        )
+        return np.concatenate([state_array, weather_block], axis=1)
 
     def _compute_house_reward(self, state: np.ndarray) -> float:
         return float(
@@ -740,7 +863,11 @@ class PPOAgent:
 
         demand_response = np.clip(1.0 - (price / price_ceiling), 0.0, 1.0)
         charge_signal = 0.75 if battery_level < (0.45 * max_battery) else 0.2
-        discharge_signal = 0.65 if (battery_level > (0.60 * max_battery) and price > default_price) else 0.1
+        discharge_signal = (
+            0.65
+            if (battery_level > (0.60 * max_battery) and price > default_price)
+            else 0.1
+        )
         buy_signal = np.clip(-net_balance, 0.0, 1.0)
         sell_signal = np.clip(net_balance, 0.0, 1.0)
         grid_import = np.clip(max(consumption - production, 0.0), 0.0, 1.0)
@@ -797,8 +924,8 @@ class PPOAgent:
     def _resolve_observation_dim() -> int:
         env_cfg = config.get("env", {})
         if hasattr(env_cfg, "get"):
-            return int(env_cfg.get("observation_dim", 10))
-        return 10
+            return max(int(env_cfg.get("observation_dim", 14)), 14)
+        return 14
 
     @staticmethod
     def _resolve_action_dim() -> int:
@@ -810,7 +937,9 @@ class PPOAgent:
     @staticmethod
     def _resolve_max_battery() -> float:
         env_cfg = config.get("env", {})
-        env_value = env_cfg.get("max_battery", None) if hasattr(env_cfg, "get") else None
+        env_value = (
+            env_cfg.get("max_battery", None) if hasattr(env_cfg, "get") else None
+        )
         top_level = config.get("max_battery", None)
         if top_level is not None:
             return float(top_level)

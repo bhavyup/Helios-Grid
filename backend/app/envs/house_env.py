@@ -81,15 +81,79 @@ class HouseEnv(Env):
         self.current_time += 1
 
         base_load = float(self.np_random.uniform(0.5, 2.0))
-        solar_gen = float(self.np_random.uniform(0.0, 1.5))
-        wind_gen = float(self.np_random.uniform(0.0, 0.5))
+
+        # Optional external household demand signal (per-house baseline)
+        try:
+            if hasattr(self, "current_consumption_target"):
+                target = getattr(self, "current_consumption_target")
+                if target is not None:
+                    base_load = float(max(0.0, target))
+        except Exception:
+            pass
+
+        # Prefer weather-driven signals when available on the instance.
+        solar_gen = None
+        wind_gen = None
+        try:
+            if hasattr(self, "current_weather") and self.current_weather is not None:
+                # Row-like object (pd.Series) supports .get(key)
+                try:
+                    solar_val = self.current_weather.get("pv_power", None)
+                except Exception:
+                    solar_val = self.current_weather.get("solar_irradiance", None)
+
+                if solar_val is not None:
+                    solar_gen = float(solar_val)
+
+                try:
+                    wind_val = self.current_weather.get("wind_speed", None)
+                    if wind_val is not None:
+                        wind_gen = float(wind_val)
+                except Exception:
+                    wind_gen = None
+        except Exception:
+            solar_gen = None
+            wind_gen = None
+
+        # Fallback to simple deterministic scaling if weather fields are normalized
+        if solar_gen is None:
+            # previous random range ~ [0, 1.5]
+            solar_gen = float(self.np_random.uniform(0.0, 1.5))
+        if wind_gen is None:
+            wind_gen = float(self.np_random.uniform(0.0, 0.5))
         production = solar_gen + wind_gen
 
         buy_signal = float(action_vec[3])
         sell_signal = float(action_vec[4])
+
+        price_ref = float(self.base_price)
+        try:
+            if hasattr(self, "current_market") and self.current_market is not None:
+                # pd.Series-like supports .get
+                try:
+                    ext_price = self.current_market.get("price", None)
+                except Exception:
+                    ext_price = None
+                if ext_price is None:
+                    try:
+                        ext_price = self.current_market.get("clearing_price", None)
+                    except Exception:
+                        ext_price = None
+                if ext_price is not None:
+                    price_ref = float(ext_price)
+        except Exception:
+            pass
+
+        # keep it in plausible bounds
+        price_ref = float(np.clip(price_ref, 0.05, 2.0))
+
         price_noise = float(self.np_random.uniform(-0.05, 0.05))
         self.last_price = float(
-            np.clip(self.base_price + price_noise + 0.2 * (buy_signal - sell_signal), 0.05, 2.0)
+            np.clip(
+                price_ref + price_noise + 0.2 * (buy_signal - sell_signal),
+                0.05,
+                2.0,
+            )
         )
 
         desired_consumption = float(base_load * (0.5 + action_vec[0]))
@@ -109,11 +173,18 @@ class HouseEnv(Env):
 
         p2p_buy = buy_signal
         p2p_sell = float(min(sell_signal, production))
-        grid_import = float(max(consumption - (production + battery_discharge), 0.0) + action_vec[5])
+        grid_import = float(
+            max(consumption - (production + battery_discharge), 0.0) + action_vec[5]
+        )
 
         self.energy = float(
             max(
-                self.energy + production + grid_import + p2p_buy - consumption - p2p_sell,
+                self.energy
+                + production
+                + grid_import
+                + p2p_buy
+                - consumption
+                - p2p_sell,
                 0.0,
             )
         )
@@ -129,7 +200,9 @@ class HouseEnv(Env):
 
     def _build_state(self) -> np.ndarray:
         net_balance = self.last_production - self.last_consumption
-        time_norm = float(min(self.current_time, self.max_episode_steps) / self.max_episode_steps)
+        time_norm = float(
+            min(self.current_time, self.max_episode_steps) / self.max_episode_steps
+        )
 
         return np.array(
             [

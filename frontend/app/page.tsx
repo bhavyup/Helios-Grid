@@ -1,198 +1,103 @@
-"use client";
+import Link from "next/link";
+import { ArrowRight, BarChart3, Globe2, LockKeyhole, Shield, Sparkles } from "lucide-react";
 
-import { AlertTriangle, Bot, Cpu, Sparkles } from "lucide-react";
-import { useState } from "react";
-
-import { EnergyCharts } from "@/components/energy-charts";
-import { ExportArtifacts } from "@/components/export-artifacts";
-import { MetricsStrip } from "@/components/metrics-strip";
-import { Neighborhood3DCard } from "@/components/neighborhood-3d-card";
-import { SimulationControls } from "@/components/simulation-controls";
-import { TopologyMap } from "@/components/topology-map";
-import { TrainingPanel } from "@/components/training-panel";
-import { useSimulation } from "@/hooks/useSimulation";
-import { useTraining } from "@/hooks/use-training";
-
-export default function DashboardPage(): JSX.Element {
-  const {
-    simulationState,
-    metrics,
-    history,
-    mode,
-    setMode,
-    autoRefresh,
-    setAutoRefresh,
-    isBusy,
-    isProfilingCsv,
-    isDerivingWeather,
-    error,
-    csvError,
-    csvSchemas,
-    csvProfile,
-    derivedWeather,
-    resetSession,
-    stepSession,
-    runSession,
-    refreshSnapshot,
-    analyzeCsv,
-    deriveWeatherFromCsv,
-  } = useSimulation();
-
-  const {
-    latestRun,
-    latestComparison,
-    rewardCurve,
-    isTraining,
-    error: trainingError,
-    runTraining,
-    runComparison,
-    refreshArtifacts,
-  } = useTraining();
-
-  const [isRunningDemo, setIsRunningDemo] = useState<boolean>(false);
-
-  const runFacultyDemoSequence = async () => {
-    setIsRunningDemo(true);
-    try {
-      await resetSession({ seed: 2026 });
-      await runSession(36);
-      await runTraining({
-        episodes: 24,
-        steps_per_episode: 24,
-        eval_episodes: 8,
-        seed: 2026,
-      });
-      await runComparison({
-        episodes: 8,
-        steps_per_episode: 24,
-        seed: 2026,
-      });
-      await Promise.all([refreshSnapshot(), refreshArtifacts()]);
-    } finally {
-      setIsRunningDemo(false);
-    }
-  };
-
-  const topology = simulationState?.topology;
-  const observation = simulationState?.observation;
-
+export default function HomePage(): JSX.Element {
   return (
-    <main className="relative z-10 min-h-screen px-4 py-5 md:px-8 md:py-7">
-      <header className="panel-surface mb-4 overflow-hidden px-6 py-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="command-badge inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]">
-              <Sparkles className="h-3.5 w-3.5" />
-              Phase 3 Command Surface
-            </p>
-            <h1 className="mt-3 font-display text-3xl font-bold tracking-[0.04em] text-white md:text-4xl">
-              Helios-Grid Mission Control Dashboard
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-300 md:text-base">
-              Show real simulation controls, live decentralized grid state, and PPO learning progress in one presentation-ready interface.
-            </p>
+    <main className="page-shell min-h-screen px-4 py-4 lg:px-6 lg:py-6">
+      <div className="mx-auto grid min-h-[calc(100vh-2rem)] w-full max-w-7xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="panel-surface relative overflow-hidden p-6 lg:p-10">
+          <div className="absolute inset-0 surface-grid" />
+          <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.14),transparent_68%)] blur-3xl" />
+          <div className="relative z-10 flex h-full flex-col justify-between gap-10">
+            <div className="max-w-3xl">
+              <p className="command-badge inline-flex items-center gap-2 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Helios-Grid / Mission Control
+              </p>
+              <h1 className="hero-display mt-5 max-w-4xl text-5xl font-semibold tracking-[-0.04em] text-white md:text-7xl">
+                A quieter, sharper operating surface for neighborhood energy.
+              </h1>
+              <p className="section-copy mt-5 max-w-2xl text-base md:text-lg">
+                Explore simulation, weather ingestion, and PPO analytics in a workspace designed like a modern control room rather than a cluttered dashboard.
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-2 rounded-full border border-[rgba(212,175,55,0.34)] bg-[rgba(212,175,55,0.12)] px-5 py-3 text-sm font-semibold text-[#f6e7be] transition hover:bg-[rgba(212,175,55,0.18)]"
+                >
+                  <LockKeyhole className="h-4 w-4" />
+                  Sign in
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-white/20 hover:bg-white/[0.07]"
+                >
+                  Open dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["Weather-first", "Upload, profile, derive, and reset from one focused workflow."],
+                ["Grid clarity", "See topology, state, and flows without reading a data dump."],
+                ["Training lens", "Compare PPO and rule-based behavior in one visual frame."],
+              ].map(([title, description]) => (
+                <article key={title} className="panel-frame rounded-[1.2rem] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-[#f6e7be]">{title}</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">{description}</p>
+                </article>
+              ))}
+            </div>
           </div>
+        </section>
 
-          <div className="grid gap-2 text-xs uppercase tracking-[0.15em] text-slate-300">
-            <div className="rounded-md border border-slate-700/70 bg-slate-900/70 px-3 py-2">
-              Episode: <span className="font-mono text-cyan-200">{simulationState?.episode_id ?? "-"}</span>
+        <aside className="space-y-6">
+          <section className="panel-surface overflow-hidden p-6 lg:p-8">
+            <p className="section-eyebrow">Operational stack</p>
+            <h2 className="hero-display mt-3 text-3xl font-semibold tracking-[-0.03em] text-white">
+              Built as a dashboard system, not a page dump.
+            </h2>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {[
+                [BarChart3, "Analytics", "Reward curves, baseline gap, and exportable artifacts."],
+                [Globe2, "Grid state", "Topology, weather source, and live simulation controls."],
+                [Shield, "Access", "Login-first flow with protected runtime actions."],
+                [Sparkles, "Motion", "Soft glow, glass panels, and editorial rhythm."],
+              ].map(([Icon, title, description]) => (
+                <article key={title as string} className="panel-frame rounded-[1.2rem] p-4">
+                  <Icon className="h-5 w-5 text-[#d4af37]" />
+                  <p className="mt-4 text-sm font-semibold text-white">{title as string}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{description as string}</p>
+                </article>
+              ))}
             </div>
-            <div className="rounded-md border border-slate-700/70 bg-slate-900/70 px-3 py-2">
-              Step: <span className="font-mono text-cyan-200">{simulationState?.step ?? "-"}</span>
+          </section>
+
+          <section className="panel-surface overflow-hidden p-6 lg:p-8">
+            <p className="section-eyebrow">Quick entry</p>
+            <h3 className="hero-display mt-3 text-2xl font-semibold tracking-[-0.03em] text-white">
+              Jump straight into the mission room.
+            </h3>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/login"
+                className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/[0.08]"
+              >
+                Login
+              </Link>
+              <Link
+                href="/dashboard"
+                className="rounded-full border border-[rgba(127,182,168,0.3)] bg-[rgba(127,182,168,0.12)] px-4 py-3 text-sm font-semibold text-[#d8f2eb] transition hover:bg-[rgba(127,182,168,0.18)]"
+              >
+                Dashboard
+              </Link>
             </div>
-            <div className="rounded-md border border-slate-700/70 bg-slate-900/70 px-3 py-2">
-              Weather Source:
-              <span className="ml-2 font-mono text-cyan-200">
-                {simulationState?.data_sources?.weather_data
-                  ? simulationState.data_sources.weather_data.split(/[\\/]/).slice(-1)[0]
-                  : "default"}
-              </span>
-            </div>
-            <div className="rounded-md border border-slate-700/70 bg-slate-900/70 px-3 py-2">
-              Mode:
-              <span className="ml-2 inline-flex items-center gap-1 font-mono text-amber-200">
-                {mode === "rule" ? <Cpu className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                {mode === "rule" ? "Rule Live" : "PPO Preview"}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {error ? (
-        <div className="mb-4 rounded-md border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-          <p className="inline-flex items-center gap-2 font-semibold uppercase tracking-[0.12em]">
-            <AlertTriangle className="h-4 w-4" />
-            Simulation API Error
-          </p>
-          <p className="mt-1 text-rose-200">{error}</p>
-        </div>
-      ) : null}
-
-      {trainingError ? (
-        <div className="mb-4 rounded-md border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
-          <p className="inline-flex items-center gap-2 font-semibold uppercase tracking-[0.12em]">
-            <AlertTriangle className="h-4 w-4" />
-            Training API Error
-          </p>
-          <p className="mt-1 text-rose-200">{trainingError}</p>
-        </div>
-      ) : null}
-
-      <MetricsStrip metrics={metrics} />
-
-      <section className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <div className="space-y-4">
-          <SimulationControls
-            mode={mode}
-            setMode={setMode}
-            autoRefresh={autoRefresh}
-            setAutoRefresh={setAutoRefresh}
-            isBusy={isBusy}
-            isProfilingCsv={isProfilingCsv}
-            isDerivingWeather={isDerivingWeather}
-            isRunningDemo={isRunningDemo || isTraining}
-            csvSchemas={csvSchemas}
-            csvProfile={csvProfile}
-            derivedWeather={derivedWeather}
-            csvError={csvError}
-            onReset={resetSession}
-            onStep={stepSession}
-            onRun={runSession}
-            onRefresh={refreshSnapshot}
-            onAnalyzeCsv={analyzeCsv}
-            onDeriveWeatherFromCsv={deriveWeatherFromCsv}
-            onRunDemoSequence={runFacultyDemoSequence}
-          />
-          <TopologyMap topology={topology} observation={observation} />
-        </div>
-
-        <div className="space-y-4">
-          <Neighborhood3DCard topology={topology} />
-          <TrainingPanel
-            latestRun={latestRun}
-            latestComparison={latestComparison}
-            rewardCurve={rewardCurve}
-            isTraining={isTraining}
-            error={trainingError}
-            onTrain={runTraining}
-            onCompare={runComparison}
-            onRefresh={refreshArtifacts}
-          />
-        </div>
-      </section>
-
-      <section className="mt-4">
-        <EnergyCharts history={history} />
-      </section>
-
-      <ExportArtifacts
-        metrics={metrics}
-        history={history}
-        latestRun={latestRun}
-        latestComparison={latestComparison}
-        rewardCurve={rewardCurve}
-      />
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }

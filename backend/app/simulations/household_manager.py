@@ -17,9 +17,7 @@ class HouseholdManager:
     ) -> None:
         self.num_households = num_households
         self._house_env_factory = house_env_factory
-        self.house_environments = [
-            house_env_factory() for _ in range(num_households)
-        ]
+        self.house_environments = [house_env_factory() for _ in range(num_households)]
 
     def seed(self, base_seed: int) -> None:
         for index, house in enumerate(self.house_environments):
@@ -29,18 +27,70 @@ class HouseholdManager:
         for house in self.house_environments:
             house.reset()
 
-    def step(self, house_actions: np.ndarray) -> List[Any]:
+    def step(
+        self,
+        house_actions: np.ndarray,
+        weather_datum: Any | None = None,
+        household_datum: Any | None = None,
+        market_datum: Any | None = None,
+    ) -> List[Any]:
+        """Step all house environments forward.
+
+        If `weather_datum` is provided it will be attached to each
+        `HouseEnv` instance as `current_weather` so `HouseEnv.step` can
+        optionally consume it without changing the Gym step signature.
+        """
         results: List[Any] = []
         for i, house in enumerate(self.house_environments):
+            try:
+                if weather_datum is not None:
+                    # attach current weather row (pd.Series-like) for consumer use
+                    setattr(house, "current_weather", weather_datum)
+            except Exception:
+                # best-effort attach; don't fail the loop if assignment fails
+                pass
+
+            # attach market + household rows as well (best-effort)
+            try:
+                if market_datum is not None:
+                    setattr(house, "current_market", market_datum)
+            except Exception:
+                pass
+
+            # derive per-house consumption target
+            try:
+                target = None
+                if household_datum is not None:
+                    # pd.Series-like supports .get
+                    per_house_key = f"consumption_{i+1}"
+                    try:
+                        v = household_datum.get(per_house_key, None)
+                    except Exception:
+                        v = None
+
+                    if v is not None:
+                        target = float(v)
+                    else:
+                        # aggregate consumption distributed equally
+                        try:
+                            total = household_datum.get("consumption", None)
+                        except Exception:
+                            total = None
+                        if total is not None:
+                            target = float(total) / max(float(self.num_households), 1.0)
+
+                setattr(house, "current_consumption_target", target)
+            except Exception:
+                # best-effort; if it fails we just don't override base_load
+                pass
+            
             results.append(house.step(house_actions[i]))
         return results
 
     def get_states(self) -> List[np.ndarray]:
         return [house.get_state() for house in self.house_environments]
 
-    def get_grid_state(
-        self, current_time: int, max_episode_steps: int
-    ) -> np.ndarray:
+    def get_grid_state(self, current_time: int, max_episode_steps: int) -> np.ndarray:
         if not self.house_environments:
             return np.zeros((self.num_households, 10), dtype=np.float32)
 

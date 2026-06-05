@@ -49,8 +49,9 @@ export function useMetrics(options: UseMetricsOptions = {}): UseMetricsState {
     (payload: SimulationStateResponse) => {
       setMetrics(payload.metrics);
       if (payload.trajectory_point) {
-        setHistory((prev) =>
-          [...prev, payload.trajectory_point].slice(-historyLimit),
+        const previous = useSimulationStore.getState().history;
+        setHistory(
+          [...previous, payload.trajectory_point].slice(-historyLimit),
         );
       }
     },
@@ -60,9 +61,8 @@ export function useMetrics(options: UseMetricsOptions = {}): UseMetricsState {
   const updateFromRun = useCallback(
     (payload: SimulationRunResponse) => {
       setMetrics(payload.metrics);
-      setHistory((prev) =>
-        [...prev, ...payload.trajectory].slice(-historyLimit),
-      );
+      const previous = useSimulationStore.getState().history;
+      setHistory([...previous, ...payload.trajectory].slice(-historyLimit));
     },
     [historyLimit, setHistory, setMetrics],
   );

@@ -30,17 +30,24 @@ def test_simulation_reset_returns_state_with_topology(auth_headers) -> None:
     assert payload["step"] == 0
     assert "observation" in payload
     assert "topology" in payload
+    assert payload["topology"]["layout"] == "neighborhood-grid"
     assert payload["topology"]["node_count"] >= 1
+    assert "x" in payload["topology"]["nodes"][0]
+    assert "y" in payload["topology"]["nodes"][0]
     assert len(payload["observation"]["house_states"]) == 4
 
 
-def test_simulation_step_is_deterministic_for_same_seed_and_actions(auth_headers) -> None:
+def test_simulation_step_is_deterministic_for_same_seed_and_actions(
+    auth_headers,
+) -> None:
     client = TestClient(app)
 
     reset_payload = {"seed": 777, "num_households": 5, "max_episode_steps": 24}
     fixed_actions = _build_zero_actions(num_households=5)
 
-    first_reset = client.post("/simulation/reset", json=reset_payload, headers=auth_headers)
+    first_reset = client.post(
+        "/simulation/reset", json=reset_payload, headers=auth_headers
+    )
     assert first_reset.status_code == 200
 
     first_step = client.post(
@@ -55,7 +62,9 @@ def test_simulation_step_is_deterministic_for_same_seed_and_actions(auth_headers
     assert first_step.status_code == 200
     first_payload = first_step.json()
 
-    second_reset = client.post("/simulation/reset", json=reset_payload, headers=auth_headers)
+    second_reset = client.post(
+        "/simulation/reset", json=reset_payload, headers=auth_headers
+    )
     assert second_reset.status_code == 200
 
     second_step = client.post(
@@ -70,8 +79,14 @@ def test_simulation_step_is_deterministic_for_same_seed_and_actions(auth_headers
     assert second_step.status_code == 200
     second_payload = second_step.json()
 
-    assert first_payload["step_result"]["reward"] == second_payload["step_result"]["reward"]
-    assert first_payload["trajectory_point"]["price"] == second_payload["trajectory_point"]["price"]
+    assert (
+        first_payload["step_result"]["reward"]
+        == second_payload["step_result"]["reward"]
+    )
+    assert (
+        first_payload["trajectory_point"]["price"]
+        == second_payload["trajectory_point"]["price"]
+    )
 
     first_house_states = np.asarray(
         first_payload["observation"]["house_states"],
@@ -154,10 +169,10 @@ def test_reset_accepts_custom_weather_csv_path(auth_headers) -> None:
 
     weather_csv = artifacts_dir / "custom_weather.csv"
     weather_csv.write_text(
-        "temperature,solar_irradiance\n"
-        "20.0,0.40\n"
-        "21.2,0.52\n"
-        "22.5,0.63\n",
+        "utc_timestamp,temperature,solar_irradiance\n"
+        "2026-01-01T12:00:00Z,20.0,0.40\n"
+        "2026-01-01T12:15:00Z,21.2,0.52\n"
+        "2026-01-01T12:30:00Z,22.5,0.63\n",
         encoding="utf-8",
     )
 
@@ -177,6 +192,15 @@ def test_reset_accepts_custom_weather_csv_path(auth_headers) -> None:
     assert payload["data_sources"]["weather_data"] == str(weather_csv)
     assert payload["seed"] == 2026
     assert payload["step"] == 0
+
+    step_response = client.post(
+        "/simulation/step",
+        json={"use_autopilot": True},
+        headers=auth_headers,
+    )
+    assert step_response.status_code == 200
+    step_payload = step_response.json()
+    assert step_payload["step_result"]["info"]["weather"]["utc_timestamp"]
 
 
 def test_derive_weather_endpoint_generates_reset_ready_csv(auth_headers) -> None:
@@ -224,3 +248,63 @@ def test_derive_weather_endpoint_generates_reset_ready_csv(auth_headers) -> None
     assert reset_response.status_code == 200
     reset_payload = reset_response.json()
     assert reset_payload["data_sources"]["weather_data"] == str(output_csv)
+
+
+def test_step_emits_p2p_trades_in_market_snapshot(auth_headers) -> None:
+    client = TestClient(app)
+
+    reset = client.post(
+        "/simulation/reset",
+        json={"seed": 42, "num_households": 16, "max_episode_steps": 10},
+        headers=auth_headers,
+    )
+    assert reset.status_code == 200
+
+    step = client.post(
+        "/simulation/step",
+        json={"use_autopilot": True, "market_action": 1},
+        headers=auth_headers,
+    )
+    assert step.status_code == 200
+    payload = step.json()
+    market_snapshot = payload["latest_info"]["market_snapshot"]
+
+    assert "p2p_orders" in market_snapshot
+    assert "p2p_trades" in market_snapshot
+    assert isinstance(market_snapshot["p2p_orders"], list)
+    assert isinstance(market_snapshot["p2p_trades"], list)
+
+
+def test_topology_layout_scales_for_64_households(auth_headers) -> None:
+    client = TestClient(app)
+
+    response = client.post(
+        "/simulation/reset",
+        json={"seed": 123, "num_households": 64, "max_episode_steps": 8},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    topology = payload["topology"]
+
+    nodes = topology["nodes"]
+    households = [n for n in nodes if n.get("type") == "household"]
+
+    assert len(households) == 64
+    assert topology.get("layout") == "neighborhood-grid"
+    assert topology.get("bounds") is not None
+
+    bounds = topology["bounds"]
+    unique_positions = set()
+    for h in households:
+        x, y = h.get("x"), h.get("y")
+        assert isinstance(x, (int, float))
+        assert isinstance(y, (int, float))
+        unique_positions.add((round(float(x), 3), round(float(y), 3)))
+
+        # within bounds
+        assert bounds["min_x"] <= x <= bounds["max_x"]
+        assert bounds["min_y"] <= y <= bounds["max_y"]
+
+    # should be fully unique for 64-house layout
+    assert len(unique_positions) >= 60

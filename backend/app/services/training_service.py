@@ -18,7 +18,7 @@ from app.infrastructure.monitoring import (
     record_training_job_started,
 )
 from app.models.ppo_agent import PPOAgent
-from app.workers.training_worker import run_ppo_training
+from app.workers.training_worker import execute_ppo_training, run_ppo_training
 
 
 class TrainingService:
@@ -54,11 +54,36 @@ class TrainingService:
             raise ValueError("eval_episodes must be greater than zero")
         if num_envs <= 0:
             raise ValueError("num_envs must be greater than zero")
-        init_ray()
         record_training_job_started()
 
         run_id = f"ppo-{uuid4()}"
         created_at = datetime.now(tz=timezone.utc).isoformat()
+
+        if wait_for_result:
+            started = time.perf_counter()
+            try:
+                result = execute_ppo_training(
+                    run_id,
+                    created_at,
+                    episodes,
+                    steps_per_episode,
+                    num_envs,
+                    eval_episodes,
+                    seed,
+                    learning_rate,
+                    hidden_dim,
+                    clip_epsilon,
+                )
+                with self._lock:
+                    finalized = self._finalize_job(run_id, result, record_metrics=True)
+                record_training_duration(time.perf_counter() - started, "completed")
+                return finalized
+            except Exception:
+                record_training_job_failed()
+                record_training_duration(time.perf_counter() - started, "failed")
+                raise
+
+        init_ray()
         ref = run_ppo_training.remote(
             run_id,
             created_at,
@@ -75,19 +100,6 @@ class TrainingService:
         with self._lock:
             self._jobs[run_id] = ref
             self._latest_job_id = run_id
-
-        if wait_for_result:
-            started = time.perf_counter()
-            try:
-                result = ray.get(ref)
-                with self._lock:
-                    finalized = self._finalize_job(run_id, result, record_metrics=True)
-                record_training_duration(time.perf_counter() - started, "completed")
-                return finalized
-            except Exception:
-                record_training_job_failed()
-                record_training_duration(time.perf_counter() - started, "failed")
-                raise
 
         return {
             "status": "running",

@@ -61,6 +61,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ./backend/data:/app/backend/data
     ports:
       - "8000:8000"
     healthcheck:
@@ -114,11 +116,17 @@ services:
       target: frontend-runtime
       args:
         HELIOS_BACKEND_URL: http://backend:8000
+        NEXT_PUBLIC_DEV_AUTH_AUTO: "true"
+        NEXT_PUBLIC_DEV_AUTH_EMAIL: dev@helios.local
+        NEXT_PUBLIC_DEV_AUTH_PASSWORD: dev-pass-123
     container_name: helios-frontend
     restart: unless-stopped
     environment:
       HELIOS_BACKEND_URL: http://backend:8000
       NEXT_PUBLIC_API_BASE_URL: /api/backend
+      NEXT_PUBLIC_DEV_AUTH_AUTO: "true"
+      NEXT_PUBLIC_DEV_AUTH_EMAIL: dev@helios.local
+      NEXT_PUBLIC_DEV_AUTH_PASSWORD: dev-pass-123
     depends_on:
       backend:
         condition: service_healthy
