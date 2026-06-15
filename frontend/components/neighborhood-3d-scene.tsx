@@ -2847,13 +2847,22 @@ export default function Neighborhood3DScene({
   step,
 }: Neighborhood3DSceneProps): JSX.Element {
   const cycle = resolveDayCycle(latestInfo, step);
+  const [mounted, setMounted] = useState(false);
+
+  // Only render the Canvas on the client after the component mounts
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false); // Cleanup on unmount/hot-reload
+  }, []);
+
+  if (!mounted) return <></>;
 
   return (
     <Canvas
       camera={{ position: [34, 25, 34], fov: 34 }}
       shadows
       dpr={[1, 1.75]}
-      gl={{ antialias: true, alpha: false }}
+      gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
     >
       <SunRig daylight={cycle.daylight} progress={cycle.progress} />
       <fog attach="fog" args={["#08111f", 85, 220]} />

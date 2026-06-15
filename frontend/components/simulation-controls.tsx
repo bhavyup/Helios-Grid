@@ -28,7 +28,7 @@ import {
   UploadedHouseholdPayload,
   UploadedMarketPayload,
 } from "@/lib/types";
-import {Portal} from "@/utils/create-portal";
+import { Portal } from "@/utils/create-portal";
 
 type WeatherSourceMode = "default" | "path" | "upload";
 type DataSourceMode = "default" | "path" | "upload";
@@ -558,6 +558,13 @@ export function SimulationControls({
     useState<File | null>(null);
 
   const lastProfileAutoFillRef = useRef<string>("");
+
+  const [openPvParameterModal, setOpenPvParameterModal] =
+    useState<boolean>(false);
+
+  function onClickPvParameters() {
+    setOpenPvParameterModal(!openPvParameterModal);
+  }
 
   const warningDetails = useMemo(
     () =>
@@ -2520,14 +2527,22 @@ export function SimulationControls({
                             setPvPowerColumnInput,
                           )}
 
-                          <div className="col-span-2 mt-3 rounded-[1rem] border border-white/10 bg-white/[0.02] p-4">
-                            <div className="flex items-center justify-between gap-3">
+                          <div className="col-span-2 mt-3 rounded-[1rem] border border-white/10 bg-white/[0.02] p-4.">
+                            <div
+                              onClick={onClickPvParameters}
+                              className="flex items-center justify-between gap-3 cursor-pointer p-4"
+                            >
                               <div>
                                 <p className="section-eyebrow text-[10px]">
                                   PV model parameters
                                 </p>
                                 <p className="mt-1 text-xs text-slate-400">
-                                  Leave blank to use backend config defaults.
+                                  Leave blank/unchanged to use backend config
+                                  defaults. Click to{" "}
+                                  <span className="underline">
+                                    {" "}
+                                    {openPvParameterModal ? "hide" : "edit"}
+                                  </span>
                                 </p>
                               </div>
                               <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-300">
@@ -2535,72 +2550,69 @@ export function SimulationControls({
                               </span>
                             </div>
 
-                            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                              {[
-                                [
-                                  "Panel tilt (deg)",
-                                  panelTiltInput,
-                                  setPanelTiltInput,
-                                  "30",
-                                ],
-                                [
-                                  "Panel azimuth (deg)",
-                                  panelAzimuthInput,
-                                  setPanelAzimuthInput,
-                                  "180",
-                                ],
-                                [
-                                  "Panel area (m²)",
-                                  panelAreaInput,
-                                  setPanelAreaInput,
-                                  "1.0",
-                                ],
-                                [
-                                  "Panel efficiency",
-                                  panelEfficiencyInput,
-                                  setPanelEfficiencyInput,
-                                  "0.15",
-                                ],
-                                [
-                                  "Temp coefficient (/K)",
-                                  tempCoefficientInput,
-                                  setTempCoefficientInput,
-                                  "-0.004",
-                                ],
-                              ].map(([label, value, setter, placeholder]) => (
-                                <label
-                                  key={String(label)}
-                                  className="grid gap-2 text-sm text-slate-200"
-                                >
-                                  <span className="section-eyebrow text-[10px]">
-                                    {String(label)}
-                                  </span>
-                                  <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={value as string}
-                                    onChange={(event) =>
-                                      (setter as (value: string) => void)(
-                                        event.target.value,
-                                      )
-                                    }
-                                    placeholder={String(placeholder)}
-                                    className="flex h-[56px] w-full items-center rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-[rgba(212,175,55,0.45)]"
-                                  />
-                                </label>
-                              ))}
-                            </div>
+                            {openPvParameterModal && (
+                              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 border-t border-white/10 p-4">
+                                {[
+                                  [
+                                    "Panel tilt (deg)",
+                                    panelTiltInput,
+                                    setPanelTiltInput,
+                                    "30",
+                                  ],
+                                  [
+                                    "Panel azimuth (deg)",
+                                    panelAzimuthInput,
+                                    setPanelAzimuthInput,
+                                    "180",
+                                  ],
+                                  [
+                                    "Panel area (m²)",
+                                    panelAreaInput,
+                                    setPanelAreaInput,
+                                    "1.0",
+                                  ],
+                                  [
+                                    "Panel efficiency",
+                                    panelEfficiencyInput,
+                                    setPanelEfficiencyInput,
+                                    "0.15",
+                                  ],
+                                  [
+                                    "Temp coefficient (/K)",
+                                    tempCoefficientInput,
+                                    setTempCoefficientInput,
+                                    "-0.004",
+                                  ],
+                                ].map(([label, value, setter, placeholder]) => (
+                                  <label
+                                    key={String(label)}
+                                    className="grid gap-2 text-sm text-slate-200"
+                                  >
+                                    <span className="section-eyebrow text-[10px]">
+                                      {String(label)}
+                                    </span>
+                                    <input
+                                      type="text"
+                                      inputMode="decimal"
+                                      value={value as string}
+                                      onChange={(event) =>
+                                        (setter as (value: string) => void)(
+                                          event.target.value,
+                                        )
+                                      }
+                                      placeholder={String(placeholder)}
+                                      className="flex h-[56px] w-full items-center rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-[rgba(212,175,55,0.45)]"
+                                    />
+                                  </label>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </>
                       ) : null}
 
                       {effectiveRole === "household" ? (
                         <>
-                          <div className="col-span-2 mt-2">
-                            <p className="section-eyebrow text-[10px]">
-                              Household fields
-                            </p>
-                          </div>
                           {[
                             [
                               "Timestamp",
@@ -2650,11 +2662,6 @@ export function SimulationControls({
 
                       {effectiveRole === "market" ? (
                         <>
-                          <div className="col-span-2 mt-2">
-                            <p className="section-eyebrow text-[10px]">
-                              Market fields
-                            </p>
-                          </div>
                           {[
                             [
                               "Timestamp",
@@ -2711,20 +2718,35 @@ export function SimulationControls({
 
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   {warningDetails.length ? (
-                    <label className="flex items-start gap-3 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-3 text-xs text-amber-100">
+                    <label className="flex items-center gap-3 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs text-amber-100">
                       <input
                         type="checkbox"
                         checked={confirmUnitMismatch}
                         onChange={(event) =>
                           setConfirmUnitMismatch(event.target.checked)
                         }
-                        className="mt-0.5 h-4 w-4 rounded border-amber-300 bg-transparent text-amber-400 focus:ring-amber-300"
+                        className="mb-0.5 h.-4 w.-4 rounded border-amber-300 bg-transparent text-amber-400 focus:ring-amber-300"
                       />
-                      <span className="leading-5">
-                        I reviewed the flagged fields and want to derive anyway.
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="leading-3">
+                          I reviewed the warnings & want to derive anyway.
+                        </span>
+                        {!confirmUnitMismatch ? (
+                          <span className="text-[8px] text-amber-300">
+                            *Derive is blocked until you confirm the review
+                            checkbox.
+                          </span>
+                        ) : (
+                          <span className="text-[8px] text-green-300">
+                            Derive is available now.
+                          </span>
+                        )}
+                      </div>
                     </label>
                   ) : null}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
                   {effectiveRole === "weather" ? (
                     <button
                       type="button"
@@ -2776,10 +2798,16 @@ export function SimulationControls({
                     </button>
                   ) : null}
 
-                  {warningDetails.length && !confirmUnitMismatch ? (
-                    <span className="text-xs text-amber-300">
-                      Derive is blocked until you confirm the review checkbox.
-                    </span>
+                  {derivedWeather?.output_file_path ? (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void handleResetWithDerivedWeather()}
+                      className="inline-flex items-center gap-2 rounded-full border border-[rgba(127,182,168,0.34)] bg-[rgba(127,182,168,0.12)] px-4 py-3 text-xs font-semibold text-[#d8f2eb] transition hover:bg-[rgba(127,182,168,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Reset with derived CSV
+                    </button>
                   ) : null}
 
                   {csvProfile?.can_use_now ? (
@@ -2791,18 +2819,6 @@ export function SimulationControls({
                     >
                       <RotateCcw className="h-4 w-4" />
                       Reset with profiled CSV
-                    </button>
-                  ) : null}
-
-                  {derivedWeather?.output_file_path ? (
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() => void handleResetWithDerivedWeather()}
-                      className="inline-flex items-center gap-2 rounded-full border border-[rgba(127,182,168,0.34)] bg-[rgba(127,182,168,0.12)] px-4 py-3 text-xs font-semibold text-[#d8f2eb] transition hover:bg-[rgba(127,182,168,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Reset with derived CSV
                     </button>
                   ) : null}
                 </div>
@@ -3028,7 +3044,7 @@ export function SimulationControls({
               </div>
             ) : null}
 
-            {derivedWeather ? (
+            {effectiveRole === 'weather' && derivedWeather ? (
               <div className="panel-frame rounded-[1.35rem] p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -3088,6 +3104,67 @@ export function SimulationControls({
                     use the derived output path to{" "}
                     <span
                       onClick={() => void handleResetWithDerivedWeather()}
+                      className=" underline cursor-pointer hover:text-emerald-200"
+                    >
+                      reset/simulate
+                    </span>{" "}
+                    the sim episode.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {effectiveRole === 'household' && derivedHousehold ? (
+              <div className="panel-frame rounded-[1.35rem] p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="section-eyebrow">Derived output</p>
+                    <h3 className="mt-2 text-lg font-semibold text-white">
+                      Normalized household ready for reset
+                    </h3>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-300">
+                    {derivedHousehold.normalization.enabled
+                      ? "Normalized"
+                      : "Raw"}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                      Rows
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-white">
+                      {derivedHousehold.rows}
+                    </p>
+                  </article>
+                  <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                      Consumption scale
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-white">
+                      {(
+                        derivedHousehold.normalization.consumption_scale ??
+                        1.0
+                      ).toFixed(2)}
+                    </p>
+                  </article>
+                </div>
+                <p className="text-xs break-all text-white mt-4">
+                  Derived Output:{" "}
+                  <span className="font-mono text-emerald-100">
+                    {derivedHousehold.output_file_path}
+                  </span>
+                </p>
+                <div className="flex items-center gap-2 mt-4">
+                  <span className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                    csv derived
+                  </span>
+                  <p className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-orange-300">
+                    use the derived output path to{" "}
+                    <span
+                      onClick={() => void handleReset()}
                       className=" underline cursor-pointer hover:text-emerald-200"
                     >
                       reset/simulate
