@@ -4,11 +4,11 @@
 
 project_name: "helios-grid"
 version: "0.1.0"
-config_version: 1  # Schema version for this config format; increment on structural changes
+config_version: 1 # Schema version for this config format; increment on structural changes
 
 # Logging and reproducibility
 log_dir: "logs"
-seed: 42  # Used for experiment reproducibility; scope depends on config loader
+seed: 42 # Used for experiment reproducibility; scope depends on config loader
 
 # Data paths (defaults used across the project)
 data_paths:
@@ -19,25 +19,27 @@ data_paths:
 
 # Environment defaults
 env:
-  num_households: 10
-  max_battery: 10        # Battery capacity in kWh
-  time_step_hours: 1     # Simulation time resolution in hours
+  num_households: 64
+  max_battery: 10 # Battery capacity in kWh
+  time_step_hours: 1 # Simulation time resolution in hours
+  num_solar_panels: 28 # 24 solar roofs out of 64 houses
+  num_wind_turbines: 4
 
 # Training defaults
 training:
-  training_steps: 1000   # Total gradient update steps across all episodes
-  episodes: 1000         # Total episodes to run
-  save_interval: 50      # Checkpoint every N episodes
+  training_steps: 1000 # Total gradient update steps across all episodes
+  episodes: 1000 # Total episodes to run
+  save_interval: 50 # Checkpoint every N episodes
 
 # Agent defaults
 agents:
-  default_lr: 3.0e-4     # Fallback learning rate; algorithm-specific sections below override this
+  default_lr: 3.0e-4 # Fallback learning rate; algorithm-specific sections below override this
   ppo:
-    lr: 3.0e-4           # Overrides default_lr for PPO
+    lr: 3.0e-4 # Overrides default_lr for PPO
     gamma: 0.99
 
 # Market defaults
 market:
-  default_price: 0.3     # Default energy price in currency/kWh
-  price_min: 0.1         # Minimum price in currency/kWh
-  price_max: 1.0         # Maximum price in currency/kWh
+  default_price: 0.3 # Default energy price in currency/kWh
+  price_min: 0.1 # Minimum price in currency/kWh
+  price_max: 1.0 # Maximum price in currency/kWh

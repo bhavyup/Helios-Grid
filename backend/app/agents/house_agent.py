@@ -1,3 +1,8 @@
+"""Compatibility wrapper for HouseAgent."""
+
+from app.domain.agents.house_agent import HouseAgent
+
+__all__ = ["HouseAgent"]
 """
 HouseAgent — Rule-based household decision agent.
 

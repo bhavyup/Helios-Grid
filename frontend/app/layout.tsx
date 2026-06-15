@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Helios-Grid Command Surface",
+  title: "Helios-Grid Mission Control",
   description:
-    "Decentralized neighborhood energy balancing dashboard for simulation controls, market dynamics, and PPO progress.",
+    "Premium decentralized energy simulation workspace for weather ingestion, live controls, PPO training, and grid analytics.",
 };
 
 interface RootLayoutProps {
@@ -16,7 +17,9 @@ interface RootLayoutProps {
 export default function RootLayout({ children }: RootLayoutProps): JSX.Element {
   return (
     <html lang="en">
-      <body className="font-body antialiased">{children}</body>
+      <body className="bg-[var(--bg-0)] font-body antialiased text-white">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

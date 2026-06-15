@@ -28,3 +28,13 @@ tools/
 
 # Generated datasets
 data/csv/*.csv
+
+__pycache__/
+.pytest_cache/
+.venv/
+docs/
+tasks/
+
+backend/data/
+backend/artifacts/
+*.csv

@@ -100,11 +100,12 @@ export function ExportArtifacts({
   };
 
   return (
-    <section className="panel-surface mt-4 px-5 py-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <section className="panel-surface mt-4 px-5 py-5 lg:px-6 lg:py-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="panel-title">Export Demo Artifacts</h2>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="section-eyebrow">Artifact export</p>
+          <h2 className="hero-display mt-2 text-3xl font-semibold tracking-[-0.03em] text-white">Export the story, not just the numbers.</h2>
+          <p className="section-copy mt-2 text-sm">
             Download chart-ready simulation and training outputs for faculty review, sharing, or external analysis.
           </p>
         </div>
@@ -114,7 +115,7 @@ export function ExportArtifacts({
             type="button"
             disabled={!hasSimulationData}
             onClick={exportSimulationCsv}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-cyan-400/70 bg-cyan-500/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-cyan-100 transition hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
             Simulation CSV
@@ -124,7 +125,7 @@ export function ExportArtifacts({
             type="button"
             disabled={!hasSimulationData}
             onClick={exportMetricsJson}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-emerald-400/70 bg-emerald-500/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-emerald-100 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
             Metrics JSON
@@ -134,7 +135,7 @@ export function ExportArtifacts({
             type="button"
             disabled={!hasTrainingData}
             onClick={exportTrainingJson}
-            className="inline-flex items-center justify-center gap-2 rounded-md border border-violet-400/70 bg-violet-500/15 px-3 py-2 text-xs font-semibold uppercase tracking-[0.1em] text-violet-100 transition hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(212,175,55,0.34)] bg-[rgba(212,175,55,0.12)] px-3 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-[#f6e7be] transition hover:bg-[rgba(212,175,55,0.18)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download className="h-3.5 w-3.5" />
             Training JSON

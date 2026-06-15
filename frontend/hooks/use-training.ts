@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ApiError, apiClient, PPOComparisonInput, PPOTrainingInput } from "@/lib/api-client";
 import { PolicyComparison, RewardCurvePayload, TrainingRunPayload } from "@/lib/types";
@@ -17,99 +18,131 @@ interface UseTrainingState {
 }
 
 export function useTraining(): UseTrainingState {
-  const [latestRun, setLatestRun] = useState<TrainingRunPayload | null>(null);
-  const [latestComparison, setLatestComparison] = useState<
+  const queryClient = useQueryClient();
+
+  const latestRunQuery = useQuery({
+    queryKey: ["training", "latest"],
+    queryFn: () => apiClient.getLatestPpoTraining(),
+  });
+
+  const latestComparisonQuery = useQuery({
+    queryKey: ["training", "comparison"],
+    queryFn: () => apiClient.getLatestPpoComparison(),
+  });
+
+  const rewardCurveQuery = useQuery({
+    queryKey: ["training", "reward-curve"],
+    queryFn: () => apiClient.getLatestRewardCurve(),
+  });
+
+  const latestRun = useMemo<TrainingRunPayload | null>(() => {
+    const payload = latestRunQuery.data;
+    if (payload && "run_id" in payload) {
+      return payload as TrainingRunPayload;
+    }
+    return null;
+  }, [latestRunQuery.data]);
+
+  const latestComparison = useMemo<
     (PolicyComparison & { run_id?: string; created_at?: string }) | null
-  >(null);
-  const [rewardCurve, setRewardCurve] = useState<RewardCurvePayload | null>(null);
-  const [isTraining, setIsTraining] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const captureError = useCallback((unknownError: unknown) => {
-    if (unknownError instanceof ApiError) {
-      setError(unknownError.message);
-      return;
+  >(() => {
+    const payload = latestComparisonQuery.data;
+    if (payload && "ppo" in payload) {
+      return payload as PolicyComparison & { run_id?: string; created_at?: string };
     }
+    return null;
+  }, [latestComparisonQuery.data]);
 
-    if (unknownError instanceof Error) {
-      setError(unknownError.message);
-      return;
+  const rewardCurve = useMemo<RewardCurvePayload | null>(() => {
+    const payload = rewardCurveQuery.data;
+    if (payload && payload.reward_curve.length > 0) {
+      return payload;
     }
+    return null;
+  }, [rewardCurveQuery.data]);
 
-    setError("An unknown training error occurred.");
-  }, []);
-
-  const refreshArtifacts = useCallback(async () => {
-    try {
-      const [runPayload, comparisonPayload, curvePayload] = await Promise.all([
-        apiClient.getLatestPpoTraining(),
-        apiClient.getLatestPpoComparison(),
-        apiClient.getLatestRewardCurve(),
-      ]);
-
-      if ("run_id" in runPayload) {
-        setLatestRun(runPayload as TrainingRunPayload);
+  const runTrainingMutation = useMutation({
+    mutationFn: (input: PPOTrainingInput) =>
+      apiClient.runPpoTraining({
+        ...input,
+        wait_for_result: input.wait_for_result ?? true,
+      }),
+    onSuccess: (payload) => {
+      if ("run_id" in payload && "training" in payload) {
+        const runPayload = payload as TrainingRunPayload;
+        queryClient.setQueryData(["training", "latest"], runPayload);
+        queryClient.setQueryData(["training", "comparison"], runPayload.comparison);
+        queryClient.setQueryData(["training", "reward-curve"], {
+          run_id: runPayload.run_id,
+          created_at: runPayload.created_at,
+          episodes: runPayload.training.episodes,
+          reward_curve: runPayload.training.reward_curve,
+        });
       }
+    },
+  });
 
-      if ("ppo" in comparisonPayload) {
-        setLatestComparison(comparisonPayload as PolicyComparison & { run_id?: string; created_at?: string });
-      }
-
-      if (curvePayload.reward_curve.length > 0) {
-        setRewardCurve(curvePayload);
-      }
-
-      setError(null);
-    } catch (unknownError) {
-      captureError(unknownError);
-    }
-  }, [captureError]);
+  const runComparisonMutation = useMutation({
+    mutationFn: (input: PPOComparisonInput) => apiClient.comparePpoAndRule(input),
+    onSuccess: (payload) => {
+      queryClient.setQueryData(["training", "comparison"], payload);
+    },
+  });
 
   const runTraining = useCallback(
     async (input: PPOTrainingInput) => {
-      setIsTraining(true);
-      try {
-        const payload = await apiClient.runPpoTraining(input);
-        setLatestRun(payload);
-        setLatestComparison(payload.comparison);
-        setRewardCurve({
-          run_id: payload.run_id,
-          created_at: payload.created_at,
-          episodes: payload.training.episodes,
-          reward_curve: payload.training.reward_curve,
-        });
-        setError(null);
-      } catch (unknownError) {
-        captureError(unknownError);
-      } finally {
-        setIsTraining(false);
-      }
+      await runTrainingMutation.mutateAsync(input);
     },
-    [captureError],
+    [runTrainingMutation],
   );
 
   const runComparison = useCallback(
     async (input: PPOComparisonInput) => {
-      try {
-        const payload = await apiClient.comparePpoAndRule(input);
-        setLatestComparison(payload);
-        setError(null);
-      } catch (unknownError) {
-        captureError(unknownError);
-      }
+      await runComparisonMutation.mutateAsync(input);
     },
-    [captureError],
+    [runComparisonMutation],
   );
 
-  useEffect(() => {
-    void refreshArtifacts();
-  }, [refreshArtifacts]);
+  const refreshArtifacts = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["training"] });
+  }, [queryClient]);
+
+  const error = useMemo(() => {
+    const candidates = [
+      runTrainingMutation.error,
+      runComparisonMutation.error,
+      latestRunQuery.error,
+      latestComparisonQuery.error,
+      rewardCurveQuery.error,
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) {
+        continue;
+      }
+      if (candidate instanceof ApiError) {
+        return candidate.message;
+      }
+      if (candidate instanceof Error) {
+        return candidate.message;
+      }
+      return "An unknown training error occurred.";
+    }
+
+    return null;
+  }, [
+    latestComparisonQuery.error,
+    latestRunQuery.error,
+    rewardCurveQuery.error,
+    runComparisonMutation.error,
+    runTrainingMutation.error,
+  ]);
 
   return {
     latestRun,
     latestComparison,
     rewardCurve,
-    isTraining,
+    isTraining: runTrainingMutation.isPending,
     error,
     runTraining,
     runComparison,

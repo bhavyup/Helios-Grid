@@ -1,4 +1,8 @@
-"""Temporary placeholder for future market-agent policy implementation."""
+"""Compatibility wrapper for MarketAgent."""
+
+from app.domain.agents.market_agent import MarketAgent
+
+__all__ = ["MarketAgent"]"""Temporary placeholder for future market-agent policy implementation."""
 
 
 class MarketAgent:

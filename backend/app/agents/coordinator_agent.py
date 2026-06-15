@@ -1,3 +1,8 @@
+"""Compatibility wrapper for CoordinatorAgent."""
+
+from app.domain.agents.coordinator_agent import CoordinatorAgent
+
+__all__ = ["CoordinatorAgent"]
 """
 CoordinatorAgent — Grid simulation orchestrator.
 

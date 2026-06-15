@@ -10,13 +10,13 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        display: ["'Exo 2'", "'Trebuchet MS'", "sans-serif"],
-        body: ["'Merriweather Sans'", "'Segoe UI'", "sans-serif"],
-        mono: ["'JetBrains Mono'", "'Consolas'", "monospace"],
+        display: ["'Fraunces'", "Georgia", "serif"],
+        body: ["'IBM Plex Sans'", "'Segoe UI'", "sans-serif"],
+        mono: ["'IBM Plex Mono'", "'Consolas'", "monospace"],
       },
       boxShadow: {
-        panel: "0 22px 40px -18px rgba(22, 39, 70, 0.45)",
-        pulse: "0 0 0 1px rgba(53, 134, 255, 0.35), 0 0 34px rgba(53, 134, 255, 0.24)",
+        panel: "0 28px 64px -28px rgba(5, 10, 18, 0.48)",
+        pulse: "0 0 0 1px rgba(214, 155, 89, 0.32), 0 0 34px rgba(154, 168, 111, 0.22)",
       },
       keyframes: {
         reveal: {
@@ -29,8 +29,8 @@ const config: Config = {
         },
       },
       animation: {
-        reveal: "reveal 420ms cubic-bezier(0.23, 1, 0.32, 1) both",
-        drift: "drift 5s ease-in-out infinite",
+        reveal: "reveal 480ms cubic-bezier(0.23, 1, 0.32, 1) both",
+        drift: "drift 6.5s ease-in-out infinite",
       },
     },
   },

@@ -5,6 +5,17 @@ export interface TopologyNode {
   id: number;
   type: string;
   label: string;
+  x?: number;
+  y?: number;
+  kind?: string;
+  asset_class?: string;
+  lot_index?: number;
+
+  // new (safe, optional)
+  row?: number;
+  col?: number;
+  serves_household_id?: number;
+  has_solar_candidate?: boolean;
 }
 
 export interface TopologyEdge {
@@ -18,6 +29,15 @@ export interface TopologyPayload {
   edges: TopologyEdge[];
   node_count: number;
   edge_count: number;
+  layout?: string;
+  bounds?: {
+    min_x: number;
+    max_x: number;
+    min_y: number;
+    max_y: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface SimulationObservation {
@@ -60,6 +80,8 @@ export interface SimulationStepResult {
 
 export interface SimulationDataSources {
   weather_data: string;
+  household_data?: string | null;
+  market_data?: string | null;
 }
 
 export interface SimulationStateResponse {
@@ -166,6 +188,17 @@ export interface CsvSchemasPayload {
   market: CsvRoleSchema;
 }
 
+export interface CsvPathOption {
+  path: string;
+  kind: string;
+  label: string;
+}
+
+export interface CsvPathsPayload {
+  paths: CsvPathOption[];
+  count: number;
+}
+
 export interface CsvProfilePayload {
   file_path: string;
   resolved_path: string;
@@ -182,6 +215,25 @@ export interface CsvProfilePayload {
   compatibility: Record<string, CsvRoleCompatibility>;
   can_use_now: boolean;
   usage_recommendation: string;
+  unit_warnings?: Array<
+    | string
+    | {
+        column: string;
+        kind: string;
+        message: string;
+        suggestion: string;
+      }
+  >;
+  time_profile?: {
+    timestamp_column?: string | null;
+    parse_ok_rate?: number;
+    start?: string | null;
+    end?: string | null;
+    median_step_seconds?: number | null;
+    rows_analyzed?: number;
+  } | null;
+
+  role_diagnostics?: Record<string, unknown>;
 }
 
 export interface DerivedWeatherPayload {
@@ -193,8 +245,61 @@ export interface DerivedWeatherPayload {
   column_mapping: Record<string, string | null>;
   normalization: {
     enabled: boolean;
-    solar_scale: number;
+    // backend may return either irradiance_scale or legacy solar_scale
+    irradiance_scale?: number;
+    solar_scale?: number;
     wind_scale: number;
   };
+  usage_recommendation: string;
+}
+
+export interface UploadedWeatherPayload {
+  file_path: string;
+  resolved_path: string;
+  rows: number;
+  columns: string[];
+  usage_recommendation: string;
+}
+
+export interface DerivedHouseholdPayload {
+  source_file_path: string;
+  resolved_source_path: string;
+  output_file_path: string;
+  rows: number;
+  columns: string[];
+  column_mapping: Record<string, string | null>;
+  normalization: {
+    enabled: boolean;
+    consumption_scale?: number;
+  };
+  usage_recommendation: string;
+}
+
+export interface DerivedMarketPayload {
+  source_file_path: string;
+  resolved_source_path: string;
+  output_file_path: string;
+  rows: number;
+  columns: string[];
+  column_mapping: Record<string, string | null>;
+  normalization: {
+    enabled: boolean;
+  };
+  usage_recommendation: string;
+}
+
+export interface UploadedHouseholdPayload {
+  file_path: string;
+  resolved_path: string;
+  rows: number;
+  columns: string[];
+  usage_recommendation: string;
+}
+
+export interface UploadedMarketPayload {
+  file_path: string;
+  resolved_path: string;
+  rows: number;
+  columns: string[];
   usage_recommendation: string;
 }

@@ -43,7 +43,9 @@ reproducibility:
 # =============================================================
 
 env:
-  num_households: 10          # household agents in the grid
+  num_households: 64          # household agents in the grid
+  num_solar_panels: 28   # 28 solar roofs out of 64 houses
+  num_wind_turbines: 4
   max_episode_steps: 1000     # maximum timesteps per episode
                               # NOTE: previously called "training_steps"
                               # in this file and in grid_env.py.
@@ -175,6 +177,6 @@ GNN_LR: 0.001                # ←── keep in sync with agents.coordinator_ag
 # DEPRECATED — migrate callers to config['env']['num_households']
 # etc., then delete these.
 
-num_households: 10            # ←── keep in sync with env.num_households
+num_households: 64            # ←── keep in sync with env.num_households
 training_steps: 1000          # ←── keep in sync with env.max_episode_steps
 max_battery: 10               # ←── keep in sync with env.max_battery

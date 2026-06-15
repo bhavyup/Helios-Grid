@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from functools import partial
 from time import perf_counter
 from typing import Dict, List
 
 import numpy as np
+from gymnasium import Env
+from gymnasium.vector import AsyncVectorEnv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -49,6 +52,61 @@ class _ActorCritic(nn.Module):
         values = self.critic(features).squeeze(-1)
         std = torch.exp(self.log_std).expand_as(means)
         return means, std, values
+
+
+class _HouseEnvVectorAdapter(Env):
+    """Gymnasium-compatible wrapper for HouseEnv."""
+
+    metadata = {"render_modes": ["human"]}
+
+    def __init__(
+        self,
+        max_episode_steps: int,
+        max_battery: float,
+        base_price: float,
+    ) -> None:
+        super().__init__()
+        self._env = HouseEnv(
+            max_episode_steps=max_episode_steps,
+            max_battery=max_battery,
+            base_price=base_price,
+        )
+        self.action_space = self._env.action_space
+        self.observation_space = self._env.observation_space
+        self._max_steps = max(1, int(max_episode_steps))
+        self._step_count = 0
+        self._max_battery = float(max_battery)
+
+    def seed(self, seed=None):
+        return self._env.seed(seed)
+
+    def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self._env.seed(seed)
+        self._step_count = 0
+        obs = self._env.reset()
+        info: Dict[str, object] = {}
+        return obs, info
+
+    def step(self, action):
+        obs = self._env.step(action)
+        reward = float(
+            compute_house_reward(
+                consumption=float(obs[1]),
+                production=float(obs[2]),
+                price=float(obs[4]),
+                battery_level=float(obs[3]),
+                max_battery=self._max_battery,
+            )
+        )
+        self._step_count += 1
+        terminated = False
+        truncated = self._step_count >= self._max_steps
+        info: Dict[str, object] = {}
+        return obs, reward, terminated, truncated, info
+
+    def close(self):
+        return self._env.close()
 
 
 class PPOAgent:
@@ -110,12 +168,15 @@ class PPOAgent:
         episodes: int = 20,
         steps_per_episode: int = 24,
         seed: int | None = None,
+        num_envs: int = 1,
     ) -> Dict[str, object]:
         """Train PPO on HouseEnv and return a rich progress artifact."""
         if episodes <= 0:
             raise ValueError("episodes must be greater than zero")
         if steps_per_episode <= 0:
             raise ValueError("steps_per_episode must be greater than zero")
+        if num_envs <= 0:
+            raise ValueError("num_envs must be greater than zero")
 
         run_seed = self.seed if seed is None else int(seed)
         self._seed_everything(run_seed)
@@ -123,55 +184,148 @@ class PPOAgent:
         started_at = perf_counter()
         reward_curve: List[Dict[str, float]] = []
 
-        for episode in range(episodes):
-            transitions: List[_Transition] = []
-            env = self._build_house_env(steps_per_episode=steps_per_episode)
-            env_seed = run_seed + (episode * 97)
-            env.seed(env_seed)
+        if num_envs <= 1:
+            for episode in range(episodes):
+                transitions: List[_Transition] = []
+                env = self._build_house_env(steps_per_episode=steps_per_episode)
+                env_seed = run_seed + (episode * 97)
+                env.seed(env_seed)
 
-            state = env.reset()
-            episode_reward = 0.0
+                state = env.reset()
+                episode_reward = 0.0
 
-            for step in range(steps_per_episode):
-                state_tensor = self._state_tensor(state)
-                with torch.no_grad():
-                    mean, std, value = self.model(state_tensor)
-                    dist = Normal(mean, std)
-                    raw_action = dist.rsample()
-                    log_prob = dist.log_prob(raw_action).sum(dim=-1)
-                    action = torch.sigmoid(raw_action).squeeze(0).cpu().numpy().astype(np.float32)
+                for step in range(steps_per_episode):
+                    state_tensor = self._state_tensor(state)
+                    with torch.no_grad():
+                        mean, std, value = self.model(state_tensor)
+                        dist = Normal(mean, std)
+                        raw_action = dist.rsample()
+                        log_prob = dist.log_prob(raw_action).sum(dim=-1)
+                        action = (
+                            torch.sigmoid(raw_action)
+                            .squeeze(0)
+                            .cpu()
+                            .numpy()
+                            .astype(np.float32)
+                        )
 
-                next_state = env.step(action)
-                reward = self._compute_house_reward(next_state)
-                done = float(step == (steps_per_episode - 1))
+                    next_state = env.step(action)
+                    reward = self._compute_house_reward(next_state)
+                    done = float(step == (steps_per_episode - 1))
 
-                transitions.append(
-                    _Transition(
-                        state=np.asarray(state, dtype=np.float32),
-                        raw_action=raw_action.squeeze(0).cpu().numpy().astype(np.float32),
-                        log_prob=float(log_prob.item()),
-                        value=float(value.item()),
-                        reward=float(reward),
-                        done=done,
+                    transitions.append(
+                        _Transition(
+                            state=np.asarray(state, dtype=np.float32),
+                            raw_action=raw_action.squeeze(0)
+                            .cpu()
+                            .numpy()
+                            .astype(np.float32),
+                            log_prob=float(log_prob.item()),
+                            value=float(value.item()),
+                            reward=float(reward),
+                            done=done,
+                        )
                     )
+
+                    state = next_state
+                    episode_reward += reward
+
+                loss_stats = self._update_policy(
+                    transitions=transitions, last_state=state
+                )
+                moving_avg = self._moving_average(
+                    [item["reward"] for item in reward_curve] + [episode_reward],
+                    5,
                 )
 
-                state = next_state
-                episode_reward += reward
-
-            loss_stats = self._update_policy(transitions=transitions, last_state=state)
-            moving_avg = self._moving_average([item["reward"] for item in reward_curve] + [episode_reward], 5)
-
-            reward_curve.append(
-                {
-                    "episode": float(episode + 1),
-                    "reward": float(episode_reward),
-                    "moving_average_reward": float(moving_avg),
-                    "policy_loss": float(loss_stats["policy_loss"]),
-                    "value_loss": float(loss_stats["value_loss"]),
-                    "entropy": float(loss_stats["entropy"]),
-                }
+                reward_curve.append(
+                    {
+                        "episode": float(episode + 1),
+                        "reward": float(episode_reward),
+                        "moving_average_reward": float(moving_avg),
+                        "policy_loss": float(loss_stats["policy_loss"]),
+                        "value_loss": float(loss_stats["value_loss"]),
+                        "entropy": float(loss_stats["entropy"]),
+                    }
+                )
+        else:
+            env = self._build_vector_env(
+                num_envs=num_envs,
+                steps_per_episode=steps_per_episode,
             )
+            try:
+                for episode in range(episodes):
+                    seeds = [run_seed + (episode * 97) + i for i in range(num_envs)]
+                    state, _ = env.reset(seed=seeds)
+                    episode_rewards = np.zeros(num_envs, dtype=np.float32)
+
+                    states_buffer: List[np.ndarray] = []
+                    raw_actions_buffer: List[np.ndarray] = []
+                    log_probs_buffer: List[np.ndarray] = []
+                    values_buffer: List[np.ndarray] = []
+                    rewards_buffer: List[np.ndarray] = []
+                    dones_buffer: List[np.ndarray] = []
+
+                    for _ in range(steps_per_episode):
+                        state_tensor = self._state_tensor(state)
+                        with torch.no_grad():
+                            mean, std, value = self.model(state_tensor)
+                            dist = Normal(mean, std)
+                            raw_action = dist.rsample()
+                            log_prob = dist.log_prob(raw_action).sum(dim=-1)
+                            action = (
+                                torch.sigmoid(raw_action)
+                                .cpu()
+                                .numpy()
+                                .astype(np.float32)
+                            )
+
+                        next_state, reward, terminated, truncated, _ = env.step(action)
+                        done = np.logical_or(terminated, truncated).astype(np.float32)
+
+                        states_buffer.append(np.asarray(state, dtype=np.float32))
+                        raw_actions_buffer.append(
+                            raw_action.detach().cpu().numpy().astype(np.float32)
+                        )
+                        log_probs_buffer.append(
+                            log_prob.detach().cpu().numpy().astype(np.float32)
+                        )
+                        values_buffer.append(
+                            value.detach().cpu().numpy().astype(np.float32)
+                        )
+                        rewards_buffer.append(np.asarray(reward, dtype=np.float32))
+                        dones_buffer.append(done)
+
+                        episode_rewards += np.asarray(reward, dtype=np.float32)
+                        state = next_state
+
+                    loss_stats = self._update_policy_vectorized(
+                        states=np.stack(states_buffer, axis=0),
+                        raw_actions=np.stack(raw_actions_buffer, axis=0),
+                        log_probs=np.stack(log_probs_buffer, axis=0),
+                        values=np.stack(values_buffer, axis=0),
+                        rewards=np.stack(rewards_buffer, axis=0),
+                        dones=np.stack(dones_buffer, axis=0),
+                        last_state=state,
+                    )
+                    episode_reward = float(np.mean(episode_rewards))
+                    moving_avg = self._moving_average(
+                        [item["reward"] for item in reward_curve] + [episode_reward],
+                        5,
+                    )
+
+                    reward_curve.append(
+                        {
+                            "episode": float(episode + 1),
+                            "reward": float(episode_reward),
+                            "moving_average_reward": float(moving_avg),
+                            "policy_loss": float(loss_stats["policy_loss"]),
+                            "value_loss": float(loss_stats["value_loss"]),
+                            "entropy": float(loss_stats["entropy"]),
+                        }
+                    )
+            finally:
+                env.close()
 
         elapsed = perf_counter() - started_at
         final_metrics = self.evaluate(
@@ -186,6 +340,7 @@ class PPOAgent:
             "seed": run_seed,
             "episodes": int(episodes),
             "steps_per_episode": int(steps_per_episode),
+            "num_envs": int(num_envs),
             "duration_seconds": float(elapsed),
             "reward_curve": reward_curve,
             "final_training_reward": float(reward_curve[-1]["reward"]),
@@ -384,6 +539,107 @@ class PPOAgent:
             "entropy": float(np.mean(entropies)) if entropies else 0.0,
         }
 
+    def _update_policy_vectorized(
+        self,
+        states: np.ndarray,
+        raw_actions: np.ndarray,
+        log_probs: np.ndarray,
+        values: np.ndarray,
+        rewards: np.ndarray,
+        dones: np.ndarray,
+        last_state: np.ndarray,
+    ) -> Dict[str, float]:
+        if states.size == 0:
+            return {"policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0}
+
+        steps, num_envs, _ = states.shape
+        states_tensor = torch.as_tensor(
+            states.reshape(steps * num_envs, self.obs_dim),
+            dtype=torch.float32,
+            device=self.device,
+        )
+        raw_actions_tensor = torch.as_tensor(
+            raw_actions.reshape(steps * num_envs, self.action_dim),
+            dtype=torch.float32,
+            device=self.device,
+        )
+        old_log_probs = torch.as_tensor(
+            log_probs.reshape(steps * num_envs),
+            dtype=torch.float32,
+            device=self.device,
+        )
+
+        with torch.no_grad():
+            _, _, last_values_tensor = self.model(self._state_tensor(last_state))
+            last_values = (
+                last_values_tensor.detach().cpu().numpy().astype(np.float32)
+            )
+
+        returns_np, advantages_np = self._compute_gae_vectorized(
+            rewards=rewards.reshape(steps, num_envs),
+            values=values.reshape(steps, num_envs),
+            dones=dones.reshape(steps, num_envs),
+            last_values=last_values,
+        )
+
+        returns = torch.as_tensor(
+            returns_np.reshape(steps * num_envs),
+            dtype=torch.float32,
+            device=self.device,
+        )
+        advantages = torch.as_tensor(
+            advantages_np.reshape(steps * num_envs),
+            dtype=torch.float32,
+            device=self.device,
+        )
+
+        total_samples = int(steps * num_envs)
+        batch_size = min(self.batch_size, total_samples)
+        policy_losses: List[float] = []
+        value_losses: List[float] = []
+        entropies: List[float] = []
+
+        for _ in range(self.ppo_epochs):
+            permutation = torch.randperm(total_samples, device=self.device)
+            for start in range(0, total_samples, batch_size):
+                batch_indices = permutation[start : start + batch_size]
+
+                means, std, value_preds = self.model(states_tensor[batch_indices])
+                dist = Normal(means, std)
+                new_log_probs = dist.log_prob(raw_actions_tensor[batch_indices]).sum(dim=-1)
+                entropy = dist.entropy().sum(dim=-1).mean()
+
+                ratio = torch.exp(new_log_probs - old_log_probs[batch_indices])
+                unclipped = ratio * advantages[batch_indices]
+                clipped = torch.clamp(
+                    ratio,
+                    1.0 - self.clip_epsilon,
+                    1.0 + self.clip_epsilon,
+                ) * advantages[batch_indices]
+                policy_loss = -torch.min(unclipped, clipped).mean()
+                value_loss = F.mse_loss(value_preds, returns[batch_indices])
+
+                loss = (
+                    policy_loss
+                    + (self.vf_coef * value_loss)
+                    - (self.entropy_coef * entropy)
+                )
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+                self.optimizer.step()
+
+                policy_losses.append(float(policy_loss.detach().cpu().item()))
+                value_losses.append(float(value_loss.detach().cpu().item()))
+                entropies.append(float(entropy.detach().cpu().item()))
+
+        return {
+            "policy_loss": float(np.mean(policy_losses)) if policy_losses else 0.0,
+            "value_loss": float(np.mean(value_losses)) if value_losses else 0.0,
+            "entropy": float(np.mean(entropies)) if entropies else 0.0,
+        }
+
     def _compute_gae(
         self,
         rewards: np.ndarray,
@@ -409,12 +665,56 @@ class PPOAgent:
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         return returns.astype(np.float32), advantages.astype(np.float32)
 
+    def _compute_gae_vectorized(
+        self,
+        rewards: np.ndarray,
+        values: np.ndarray,
+        dones: np.ndarray,
+        last_values: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        advantages = np.zeros_like(rewards, dtype=np.float32)
+        gae = np.zeros(rewards.shape[1], dtype=np.float32)
+
+        for timestep in reversed(range(rewards.shape[0])):
+            if timestep == rewards.shape[0] - 1:
+                next_values = last_values
+            else:
+                next_values = values[timestep + 1]
+
+            mask = 1.0 - dones[timestep]
+            delta = rewards[timestep] + (self.gamma * next_values * mask) - values[timestep]
+            gae = delta + (self.gamma * self.gae_lambda * mask * gae)
+            advantages[timestep] = gae
+
+        returns = advantages + values
+        flat_adv = advantages.reshape(-1)
+        advantages = (advantages - flat_adv.mean()) / (flat_adv.std() + 1e-8)
+        return returns.astype(np.float32), advantages.astype(np.float32)
+
     def _build_house_env(self, steps_per_episode: int) -> HouseEnv:
         return HouseEnv(
             max_episode_steps=steps_per_episode,
             max_battery=self._resolve_max_battery(),
             base_price=self._resolve_default_price(),
         )
+
+    def _build_vector_env(
+        self,
+        num_envs: int,
+        steps_per_episode: int,
+    ) -> AsyncVectorEnv:
+        max_battery = self._resolve_max_battery()
+        base_price = self._resolve_default_price()
+        env_fns = [
+            partial(
+                _HouseEnvVectorAdapter,
+                max_episode_steps=steps_per_episode,
+                max_battery=max_battery,
+                base_price=base_price,
+            )
+            for _ in range(num_envs)
+        ]
+        return AsyncVectorEnv(env_fns)
 
     def _compute_house_reward(self, state: np.ndarray) -> float:
         return float(
@@ -458,7 +758,10 @@ class PPOAgent:
         )
 
     def _state_tensor(self, state: np.ndarray) -> torch.Tensor:
-        return torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+        state_array = np.asarray(state, dtype=np.float32)
+        if state_array.ndim == 1:
+            state_array = state_array[None, :]
+        return torch.as_tensor(state_array, dtype=torch.float32, device=self.device)
 
     @staticmethod
     def _moving_average(values: List[float], window: int) -> float:

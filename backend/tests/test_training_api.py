@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-def test_training_run_returns_progress_artifact() -> None:
+def test_training_run_returns_progress_artifact(auth_headers) -> None:
     client = TestClient(app)
 
     response = client.post(
@@ -17,7 +17,9 @@ def test_training_run_returns_progress_artifact() -> None:
             "steps_per_episode": 8,
             "eval_episodes": 2,
             "seed": 2026,
+            "wait_for_result": True,
         },
+        headers=auth_headers,
     )
 
     assert response.status_code == 200
@@ -39,7 +41,7 @@ def test_training_run_returns_progress_artifact() -> None:
     assert "deltas" in comparison
 
 
-def test_training_latest_and_reward_curve_endpoints() -> None:
+def test_training_latest_and_reward_curve_endpoints(auth_headers) -> None:
     client = TestClient(app)
 
     run_response = client.post(
@@ -49,7 +51,9 @@ def test_training_latest_and_reward_curve_endpoints() -> None:
             "steps_per_episode": 6,
             "eval_episodes": 2,
             "seed": 77,
+            "wait_for_result": True,
         },
+        headers=auth_headers,
     )
     assert run_response.status_code == 200
     run_payload = run_response.json()
@@ -66,7 +70,7 @@ def test_training_latest_and_reward_curve_endpoints() -> None:
     assert len(curve_payload["reward_curve"]) == 2
 
 
-def test_training_comparison_endpoint_returns_baseline_delta() -> None:
+def test_training_comparison_endpoint_returns_baseline_delta(auth_headers) -> None:
     client = TestClient(app)
 
     # Ensure at least one trained model exists in service state.
@@ -77,7 +81,9 @@ def test_training_comparison_endpoint_returns_baseline_delta() -> None:
             "steps_per_episode": 6,
             "eval_episodes": 2,
             "seed": 88,
+            "wait_for_result": True,
         },
+        headers=auth_headers,
     )
     assert warmup_response.status_code == 200
 
@@ -88,6 +94,7 @@ def test_training_comparison_endpoint_returns_baseline_delta() -> None:
             "steps_per_episode": 6,
             "seed": 99,
         },
+        headers=auth_headers,
     )
     assert compare_response.status_code == 200
     compare_payload = compare_response.json()

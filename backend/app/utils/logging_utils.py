@@ -34,6 +34,9 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
+from pathlib import Path
+
+from app.infrastructure.path_utils import validate_and_resolve
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +120,10 @@ def append_log_entry(
     """
     _ensure_dir(log_dir)
     file_path = os.path.join(log_dir, filename)
-    with open(file_path, "a") as f:
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
+    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+    with resolved.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, cls=_SafeEncoder) + "\n")
 
 
@@ -136,7 +142,10 @@ def save_log_entry(
     """
     _ensure_dir(log_dir)
     file_path = os.path.join(log_dir, filename)
-    with open(file_path, "w") as f:
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
+    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+    with resolved.open("w", encoding="utf-8") as f:
         json.dump(entry, f, indent=4, cls=_SafeEncoder)
 
 
@@ -153,12 +162,18 @@ def save_logs_to_csv(
     _ensure_dir(log_dir)
     df = pd.DataFrame(logs)
     file_path = os.path.join(log_dir, filename)
-    df.to_csv(file_path, index=False)
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
+    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+    df.to_csv(resolved, index=False)
 
 
 def load_logs_from_csv(file_path: str) -> List[Dict[str, Any]]:
     """Load logs from a CSV file into a list of dicts."""
-    df = pd.read_csv(file_path)
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
+    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=True)
+    df = pd.read_csv(resolved)
     return df.to_dict(orient="records")
 
 
@@ -177,13 +192,16 @@ def export_jsonl_to_csv(
     Returns:
         Path to the written CSV.
     """
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
     if csv_path is None:
         csv_path = os.path.splitext(jsonl_path)[0] + ".csv"
     entries = load_logs_from_jsonl(jsonl_path)
     if entries:
-        pd.DataFrame(entries).to_csv(csv_path, index=False)
-    else:
-        logger.warning("No entries in %s — CSV not written.", jsonl_path)
+        resolved = validate_and_resolve(csv_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+        pd.DataFrame(entries).to_csv(resolved, index=False)
+        return str(resolved)
+    logger.warning("No entries in %s — CSV not written.", jsonl_path)
     return csv_path
 
 
@@ -193,11 +211,16 @@ def export_jsonl_to_csv(
 
 def load_logs_from_jsonl(file_path: str) -> List[Dict[str, Any]]:
     """Load all entries from a JSONL file."""
-    if not os.path.exists(file_path):
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
+    try:
+        resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=True)
+    except FileNotFoundError:
         logger.warning("JSONL file not found: %s", file_path)
         return []
+
     entries: List[Dict[str, Any]] = []
-    with open(file_path, "r") as f:
+    with resolved.open("r", encoding="utf-8") as f:
         for line_num, line in enumerate(f, 1):
             line = line.strip()
             if not line:
@@ -354,14 +377,17 @@ def get_all_logs(log_dir: str) -> List[Dict[str, Any]]:
 
     Reads both ``.jsonl`` and ``.csv`` files.
     """
-    if not os.path.isdir(log_dir):
+    backend_root = Path(__file__).resolve().parents[2]
+    workspace_root = backend_root.parent
+    try:
+        resolved_dir = validate_and_resolve(log_dir, allowed_roots=[backend_root, workspace_root], must_exist=True)
+    except FileNotFoundError:
         logger.warning("Log directory not found: %s", log_dir)
         return []
 
     logs: List[Dict[str, Any]] = []
-
-    for filename in sorted(os.listdir(log_dir)):
-        file_path = os.path.join(log_dir, filename)
+    for filename in sorted(os.listdir(resolved_dir)):
+        file_path = os.path.join(str(resolved_dir), filename)
         if filename.endswith(".jsonl"):
             logs.extend(load_logs_from_jsonl(file_path))
         elif filename.endswith(".csv"):

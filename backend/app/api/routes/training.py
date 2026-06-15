@@ -17,11 +17,13 @@ class PPOTrainRequest(BaseModel):
 
     episodes: int = Field(default=20, ge=1, le=500)
     steps_per_episode: int = Field(default=24, ge=1, le=500)
+    num_envs: int = Field(default=1, ge=1, le=64)
     eval_episodes: int = Field(default=5, ge=1, le=100)
     seed: int | None = Field(default=None, ge=0)
     learning_rate: float | None = Field(default=None, gt=0.0, lt=1.0)
     hidden_dim: int | None = Field(default=None, ge=32, le=1024)
     clip_epsilon: float | None = Field(default=None, gt=0.0, lt=1.0)
+    wait_for_result: bool = False
 
 
 class PPOComparisonRequest(BaseModel):
@@ -34,16 +36,30 @@ class PPOComparisonRequest(BaseModel):
 
 @router.post("/ppo/run")
 def run_ppo_training(request: PPOTrainRequest) -> dict[str, Any]:
-    """Train PPO and return run artifact with progress and comparison."""
+    """Submit PPO training and return job metadata or result."""
     return training_service.train_ppo(
         episodes=request.episodes,
         steps_per_episode=request.steps_per_episode,
+        num_envs=request.num_envs,
         eval_episodes=request.eval_episodes,
         seed=request.seed,
         learning_rate=request.learning_rate,
         hidden_dim=request.hidden_dim,
         clip_epsilon=request.clip_epsilon,
+        wait_for_result=request.wait_for_result,
     )
+
+
+@router.get("/ppo/status/{job_id}")
+def get_ppo_status(job_id: str) -> dict[str, Any]:
+    """Return PPO job status without blocking."""
+    return training_service.get_job_status(job_id)
+
+
+@router.get("/ppo/result/{job_id}")
+def get_ppo_result(job_id: str) -> dict[str, Any]:
+    """Return PPO job result when completed."""
+    return training_service.get_job_result(job_id)
 
 
 @router.get("/ppo/latest")
