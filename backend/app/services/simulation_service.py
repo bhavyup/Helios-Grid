@@ -584,8 +584,7 @@ class SimulationService:
             "selected_role": selected_role,
             "compatibility": compatibility,
             "can_use_now": bool(
-                selected_role == "weather"
-                and selected_compatibility.get("compatible", False)
+                selected_compatibility.get("compatible", False)
                 and selected_compatibility.get("runtime_supported_now", False)
             ),
             "usage_recommendation": recommendation,
@@ -1762,16 +1761,16 @@ class SimulationService:
         if selected_role == "household":
             if compatibility.get("compatible", False):
                 return (
-                    "Schema matches household loader expectations. It can be consumed by "
-                    "load_household_data and is ready for upcoming GridEnv household-data wiring."
+                    "This CSV is compatible with household ingestion and can be used immediately "
+                    "by passing household_data_path when resetting the simulation."
                 )
             return "Add a consumption column to make this household-compatible."
 
         if selected_role == "market":
             if compatibility.get("compatible", False):
                 return (
-                    "Schema matches market loader expectations. It can be consumed by load_market_data "
-                    "and is ready for upcoming GridEnv market-data wiring."
+                    "This CSV is compatible with market ingestion and can be used immediately "
+                    "by passing market_data_path when resetting the simulation."
                 )
             return (
                 "Add supply, demand, and price columns to make this market-compatible."

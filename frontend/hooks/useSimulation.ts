@@ -90,6 +90,8 @@ export function useSimulation(): UseSimulationState {
   const [demoPhase, setDemoPhase] = useState("Idle");
   const [demoProgress, setDemoProgress] = useState(0);
 
+  const [activePaths, setActivePaths] = useState<{ weather?: string; household?: string; market?: string }>({});
+
   const demoCancelRef = useRef(false);
 
   const {
@@ -111,6 +113,10 @@ export function useSimulation(): UseSimulationState {
     csvProfile,
     derivedWeather,
     uploadedWeather,
+    derivedHousehold,
+    uploadedHousehold,
+    derivedMarket,
+    uploadedMarket,
     analyzeCsv,
     deriveWeatherFromCsv,
     uploadWeatherCsv,
@@ -174,6 +180,16 @@ export function useSimulation(): UseSimulationState {
   const resetSession = useCallback(
     async (input?: ResetSessionInput) => {
       setIsBusy(true);
+
+      // Cache the paths so the demo sequence can find them later
+    if (input) {
+        setActivePaths(prev => ({
+            weather: input.weatherDataPath ?? prev.weather,
+            household: input.householdDataPath ?? prev.household,
+            market: input.marketDataPath ?? prev.market,
+        }));
+    }
+
       try {
         const payload = await apiClient.resetSimulation({
           seed: input?.seed,
@@ -325,6 +341,18 @@ export function useSimulation(): UseSimulationState {
       const demoWeatherPath =
         derivedWeather?.output_file_path ??
         uploadedWeather?.resolved_path ??
+        activePaths.weather ??
+        undefined;
+
+      const demoHouseholdPath =
+        derivedHousehold?.output_file_path ??
+        uploadedHousehold?.resolved_path ??
+        activePaths.household ??
+        undefined;
+      const demoMarketPath =
+        derivedMarket?.output_file_path ??
+        uploadedMarket?.resolved_path ??
+        activePaths.market ??
         undefined;
 
       await resetSession({
@@ -332,6 +360,8 @@ export function useSimulation(): UseSimulationState {
         numHouseholds: 64,
         maxEpisodeSteps: 4000,
         weatherDataPath: demoWeatherPath,
+        householdDataPath: demoHouseholdPath,
+        marketDataPath: demoMarketPath,
       });
 
       // Small pause so the audience sees the reset “snap”
@@ -505,6 +535,11 @@ export function useSimulation(): UseSimulationState {
     mergeTopology,
     updateFromStep,
     setError,
+    derivedHousehold?.output_file_path,
+    uploadedHousehold?.resolved_path,
+    derivedMarket?.output_file_path,
+    uploadedMarket?.resolved_path,
+    activePaths,
   ]);
 
   return {

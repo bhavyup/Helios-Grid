@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # JWT secret should not be hardcoded. Prefer `JWT_SECRET_KEY` in environment or a secret backend.
     jwt_secret_key: str | None = None
     jwt_algorithm: str = "HS256"
-    access_token_expires_minutes: int = 15
+    access_token_expires_minutes: int = 60
     refresh_token_expires_days: int = 7
     refresh_token_rotate: bool = True
     # Rate limiting
