@@ -51,7 +51,7 @@
   <img src="https://img.shields.io/github/stars/bhavyup/Helios-Grid?color=f6e7be&style=flat-square" alt="Stars">
   <img src="https://img.shields.io/github/forks/bhavyup/Helios-Grid?color=7fb6a8&style=flat-square" alt="Forks">
   <img src="https://img.shields.io/github/last-commit/bhavyup/Helios-Grid?color=d4af37&style=flat-square" alt="Last Commit">
-  <img src="https://img.shields.io/github/actions/workflow/status/bhavyup/CopyTool-GO/ci-cd.yml?branch=main&style=flat-square" alt="CI/CD">
+  <img src="https://img.shields.io/github/actions/workflow/status/bhavyup/Helios-Grid/ci-cd.yml?branch=main&style=flat-square" alt="CI/CD">
 </p>
 
 ---
