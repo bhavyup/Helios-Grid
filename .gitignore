@@ -39,6 +39,7 @@ logs/
 *.log
 backend/logs/
 backend/artifacts/
+*.csv
 
 # =============================================================================
 # Frontend — Node.js / Next.js
