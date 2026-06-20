@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import time
+from datetime import UTC, datetime
 from threading import RLock
-from typing import Any, Dict
+from typing import Any
 from uuid import uuid4
 
 import ray  # type: ignore[import-not-found]
 
-from app.infrastructure.ray_client import init_ray
 from app.infrastructure.monitoring import (
     record_training_duration,
     record_training_job_completed,
     record_training_job_failed,
     record_training_job_started,
 )
+from app.infrastructure.ray_client import init_ray
 from app.models.ppo_agent import PPOAgent
 from app.workers.training_worker import execute_ppo_training, run_ppo_training
 
@@ -27,10 +27,10 @@ class TrainingService:
     def __init__(self) -> None:
         self._lock = RLock()
         self._agent: PPOAgent | None = None
-        self._latest_run: Dict[str, Any] = {}
-        self._latest_comparison: Dict[str, Any] = {}
-        self._jobs: Dict[str, Any] = {}
-        self._job_results: Dict[str, Dict[str, Any]] = {}
+        self._latest_run: dict[str, Any] = {}
+        self._latest_comparison: dict[str, Any] = {}
+        self._jobs: dict[str, Any] = {}
+        self._job_results: dict[str, dict[str, Any]] = {}
         self._latest_job_id: str | None = None
 
     def train_ppo(
@@ -44,7 +44,7 @@ class TrainingService:
         hidden_dim: int | None = None,
         clip_epsilon: float | None = None,
         wait_for_result: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Submit PPO training to Ray and return job metadata or result."""
         if episodes <= 0:
             raise ValueError("episodes must be greater than zero")
@@ -57,7 +57,7 @@ class TrainingService:
         record_training_job_started()
 
         run_id = f"ppo-{uuid4()}"
-        created_at = datetime.now(tz=timezone.utc).isoformat()
+        created_at = datetime.now(tz=UTC).isoformat()
 
         if wait_for_result:
             started = time.perf_counter()
@@ -107,7 +107,7 @@ class TrainingService:
             "created_at": created_at,
         }
 
-    def get_job_status(self, job_id: str) -> Dict[str, Any]:
+    def get_job_status(self, job_id: str) -> dict[str, Any]:
         """Return job status without blocking on completion."""
         with self._lock:
             if job_id in self._job_results:
@@ -137,7 +137,7 @@ class TrainingService:
                 "job_id": job_id,
             }
 
-    def get_job_result(self, job_id: str) -> Dict[str, Any]:
+    def get_job_result(self, job_id: str) -> dict[str, Any]:
         """Return job result if completed; otherwise a status payload."""
         with self._lock:
             if job_id in self._job_results:
@@ -158,7 +158,7 @@ class TrainingService:
                 "job_id": job_id,
             }
 
-    def _finalize_job_if_ready(self, job_id: str) -> Dict[str, Any] | None:
+    def _finalize_job_if_ready(self, job_id: str) -> dict[str, Any] | None:
         ref = self._jobs.get(job_id)
         if ref is None:
             return None
@@ -174,9 +174,9 @@ class TrainingService:
     def _finalize_job(
         self,
         job_id: str,
-        result: Dict[str, Any],
+        result: dict[str, Any],
         record_metrics: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         self._jobs.pop(job_id, None)
         self._job_results[job_id] = dict(result)
         self._latest_run = dict(result)
@@ -195,7 +195,7 @@ class TrainingService:
         episodes: int,
         steps_per_episode: int,
         seed: int | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Evaluate latest PPO policy against rule baseline."""
         if episodes <= 0:
             raise ValueError("episodes must be greater than zero")
@@ -218,12 +218,12 @@ class TrainingService:
             )
             self._latest_comparison = {
                 "run_id": self._latest_run.get("run_id", "bootstrap"),
-                "created_at": datetime.now(tz=timezone.utc).isoformat(),
+                "created_at": datetime.now(tz=UTC).isoformat(),
                 **comparison,
             }
             return dict(self._latest_comparison)
 
-    def get_latest_run(self) -> Dict[str, Any]:
+    def get_latest_run(self) -> dict[str, Any]:
         """Return latest training payload or a bootstrap status object."""
         with self._lock:
             if not self._latest_run:
@@ -238,7 +238,7 @@ class TrainingService:
                 }
             return dict(self._latest_run)
 
-    def get_latest_comparison(self) -> Dict[str, Any]:
+    def get_latest_comparison(self) -> dict[str, Any]:
         """Return latest comparison payload or status object."""
         with self._lock:
             if not self._latest_comparison:
@@ -248,7 +248,7 @@ class TrainingService:
                 }
             return dict(self._latest_comparison)
 
-    def get_latest_reward_curve(self) -> Dict[str, Any]:
+    def get_latest_reward_curve(self) -> dict[str, Any]:
         """Return reward curve artifact from latest training run."""
         with self._lock:
             if not self._latest_run:

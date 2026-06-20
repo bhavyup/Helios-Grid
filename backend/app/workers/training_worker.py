@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict
+from datetime import UTC, datetime
+from typing import Any
 
 import ray
 
-from app.infrastructure.monitoring import record_training_job_failed
 from app.infrastructure.mlflow_tracker import log_training_run, mlflow_enabled
 from app.infrastructure.model_registry import store_training_artifacts
+from app.infrastructure.monitoring import record_training_job_failed
 from app.models.ppo_agent import PPOAgent
 
 
@@ -22,7 +22,7 @@ def execute_ppo_training(
     learning_rate: float | None,
     hidden_dim: int | None,
     clip_epsilon: float | None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     agent = PPOAgent(
         seed=seed,
         learning_rate=learning_rate,
@@ -43,7 +43,7 @@ def execute_ppo_training(
         seed=None if seed is None else int(seed) + 10_000,
     )
 
-    timestamp = created_at or datetime.now(tz=timezone.utc).isoformat()
+    timestamp = created_at or datetime.now(tz=UTC).isoformat()
     mlflow_run_id = None
     registry_artifacts = None
     if mlflow_enabled():
@@ -95,7 +95,7 @@ def run_ppo_training(
     learning_rate: float | None,
     hidden_dim: int | None,
     clip_epsilon: float | None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     try:
         return execute_ppo_training(
             run_id=run_id,

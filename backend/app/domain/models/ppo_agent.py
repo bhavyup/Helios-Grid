@@ -6,14 +6,13 @@ import random
 from dataclasses import dataclass
 from functools import partial
 from time import perf_counter
-from typing import Dict, List
 
 import numpy as np
-from gymnasium import Env
-from gymnasium.vector import AsyncVectorEnv
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from gymnasium import Env
+from gymnasium.vector import AsyncVectorEnv
 from torch.distributions import Normal
 
 from app.core.project_config import config
@@ -97,15 +96,15 @@ class _HouseEnvVectorAdapter(Env):
         self._step_count = 0
         weather_row = self._weather_row()
         if weather_row is not None:
-            setattr(self._env, "current_weather", weather_row)
+            self._env.current_weather = weather_row
         obs = self._env.reset()
-        info: Dict[str, object] = {}
+        info: dict[str, object] = {}
         return obs, info
 
     def step(self, action):
         weather_row = self._weather_row()
         if weather_row is not None:
-            setattr(self._env, "current_weather", weather_row)
+            self._env.current_weather = weather_row
         obs = self._env.step(action)
         reward = float(
             compute_house_reward(
@@ -119,7 +118,7 @@ class _HouseEnvVectorAdapter(Env):
         self._step_count += 1
         terminated = False
         truncated = self._step_count >= self._max_steps
-        info: Dict[str, object] = {}
+        info: dict[str, object] = {}
         return obs, reward, terminated, truncated, info
 
     def close(self):
@@ -189,7 +188,7 @@ class PPOAgent:
             self.model.parameters(), lr=self.learning_rate
         )
 
-        self._latest_training_summary: Dict[str, object] = {}
+        self._latest_training_summary: dict[str, object] = {}
 
         self._seed_everything(self.seed)
 
@@ -199,7 +198,7 @@ class PPOAgent:
         steps_per_episode: int = 24,
         seed: int | None = None,
         num_envs: int = 1,
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         """Train PPO on HouseEnv and return a rich progress artifact."""
         if episodes <= 0:
             raise ValueError("episodes must be greater than zero")
@@ -212,11 +211,11 @@ class PPOAgent:
         self._seed_everything(run_seed)
 
         started_at = perf_counter()
-        reward_curve: List[Dict[str, float]] = []
+        reward_curve: list[dict[str, float]] = []
 
         if num_envs <= 1:
             for episode in range(episodes):
-                transitions: List[_Transition] = []
+                transitions: list[_Transition] = []
                 env = self._build_house_env(steps_per_episode=steps_per_episode)
                 env_seed = run_seed + (episode * 97)
                 env.seed(env_seed)
@@ -295,12 +294,12 @@ class PPOAgent:
                     state, _ = env.reset(seed=seeds)
                     episode_rewards = np.zeros(num_envs, dtype=np.float32)
 
-                    states_buffer: List[np.ndarray] = []
-                    raw_actions_buffer: List[np.ndarray] = []
-                    log_probs_buffer: List[np.ndarray] = []
-                    values_buffer: List[np.ndarray] = []
-                    rewards_buffer: List[np.ndarray] = []
-                    dones_buffer: List[np.ndarray] = []
+                    states_buffer: list[np.ndarray] = []
+                    raw_actions_buffer: list[np.ndarray] = []
+                    log_probs_buffer: list[np.ndarray] = []
+                    values_buffer: list[np.ndarray] = []
+                    rewards_buffer: list[np.ndarray] = []
+                    dones_buffer: list[np.ndarray] = []
 
                     for _ in range(steps_per_episode):
                         weather_row = self._weather_row(len(states_buffer))
@@ -380,7 +379,7 @@ class PPOAgent:
             seed=run_seed + 1000,
         )
 
-        summary: Dict[str, object] = {
+        summary: dict[str, object] = {
             "algorithm": "ppo-proof-of-life",
             "seed": run_seed,
             "episodes": int(episodes),
@@ -415,7 +414,7 @@ class PPOAgent:
         steps_per_episode: int = 24,
         policy_mode: str = "ppo",
         seed: int | None = None,
-    ) -> Dict[str, float | int | str]:
+    ) -> dict[str, float | int | str]:
         """Evaluate PPO policy or rule baseline on HouseEnv."""
         if episodes <= 0:
             raise ValueError("episodes must be greater than zero")
@@ -473,7 +472,7 @@ class PPOAgent:
         episodes: int = 5,
         steps_per_episode: int = 24,
         seed: int | None = None,
-    ) -> Dict[str, object]:
+    ) -> dict[str, object]:
         """Compute side-by-side metrics for rule baseline and PPO policy."""
         ppo_metrics = self.evaluate(
             episodes=episodes,
@@ -507,14 +506,14 @@ class PPOAgent:
         }
 
     @property
-    def latest_training_summary(self) -> Dict[str, object]:
+    def latest_training_summary(self) -> dict[str, object]:
         return dict(self._latest_training_summary)
 
     def _update_policy(
         self,
-        transitions: List[_Transition],
+        transitions: list[_Transition],
         last_state: np.ndarray,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         if not transitions:
             return {"policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0}
 
@@ -554,9 +553,9 @@ class PPOAgent:
         )
 
         batch_size = min(self.batch_size, len(transitions))
-        policy_losses: List[float] = []
-        value_losses: List[float] = []
-        entropies: List[float] = []
+        policy_losses: list[float] = []
+        value_losses: list[float] = []
+        entropies: list[float] = []
 
         for _ in range(self.ppo_epochs):
             permutation = torch.randperm(len(transitions), device=self.device)
@@ -611,7 +610,7 @@ class PPOAgent:
         rewards: np.ndarray,
         dones: np.ndarray,
         last_state: np.ndarray,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         if states.size == 0:
             return {"policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0}
 
@@ -656,9 +655,9 @@ class PPOAgent:
 
         total_samples = int(steps * num_envs)
         batch_size = min(self.batch_size, total_samples)
-        policy_losses: List[float] = []
-        value_losses: List[float] = []
-        entropies: List[float] = []
+        policy_losses: list[float] = []
+        value_losses: list[float] = []
+        entropies: list[float] = []
 
         for _ in range(self.ppo_epochs):
             permutation = torch.randperm(total_samples, device=self.device)
@@ -799,7 +798,7 @@ class PPOAgent:
         if weather_row is None:
             return
         try:
-            setattr(env, "current_weather", weather_row)
+            env.current_weather = weather_row
         except Exception:
             pass
 
@@ -891,7 +890,7 @@ class PPOAgent:
         return torch.as_tensor(state_array, dtype=torch.float32, device=self.device)
 
     @staticmethod
-    def _moving_average(values: List[float], window: int) -> float:
+    def _moving_average(values: list[float], window: int) -> float:
         if not values:
             return 0.0
         effective_window = max(1, min(window, len(values)))

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import sys
 from logging.config import fileConfig
 from pathlib import Path
-import sys
+
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
 
 config = context.config
 
@@ -16,9 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.core.settings import settings
-from app.infrastructure.database import Base
-from app.repositories import db_models
+from app.core.settings import settings  # noqa: E402  (sys.path must be set first)
+from app.infrastructure.database import Base  # noqa: E402  (sys.path must be set first)
 
 config.set_main_option("sqlalchemy.url", settings.database_url)
 

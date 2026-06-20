@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import os
 import logging
-from typing import Optional
+import os
 
 import requests
 
@@ -11,11 +10,11 @@ from app.core.settings import settings
 logger = logging.getLogger(__name__)
 
 
-def _from_env(name: str) -> Optional[str]:
+def _from_env(name: str) -> str | None:
     return os.environ.get(name)
 
 
-def _from_vault(name: str) -> Optional[str]:
+def _from_vault(name: str) -> str | None:
     # Minimal Vault KV v2 support. Requires settings.vault_addr and settings.vault_token.
     addr = settings.vault_addr or os.environ.get("VAULT_ADDR")
     token = settings.vault_token or os.environ.get("VAULT_TOKEN")
@@ -36,7 +35,7 @@ def _from_vault(name: str) -> Optional[str]:
         return None
 
 
-def get_secret(name: str, fallback: Optional[str] = None) -> Optional[str]:
+def get_secret(name: str, fallback: str | None = None) -> str | None:
     # 1) Environment
     val = _from_env(name)
     if val:

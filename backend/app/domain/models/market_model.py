@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 
 class MarketModel:
@@ -33,7 +34,7 @@ class MarketModel:
         self.household_consumption = 0.0
         self.solar_production = 0.0
         self.wind_production = 0.0
-        self.last_snapshot: Dict[str, float] = {}
+        self.last_snapshot: dict[str, float] = {}
 
         self.reset()
 
@@ -49,7 +50,7 @@ class MarketModel:
         """Return the latest clearing price."""
         return float(self.clearing_price)
 
-    def reset(self, *args: Any, **kwargs: Any) -> Dict[str, float]:
+    def reset(self, *args: Any, **kwargs: Any) -> dict[str, float]:
         """Reset market state and return the initial snapshot."""
         self.clearing_price = float(self.default_price)
         self.grid_balance = 0.0
@@ -84,11 +85,11 @@ class MarketModel:
         supply: float | None = None,
         demand: float | None = None,
         market_action: int = 1,
-        households: Iterable[Dict[str, Any]] | None = None,
+        households: Iterable[dict[str, Any]] | None = None,
         solar: float | None = None,
         wind: float | None = None,
         **kwargs: Any,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Advance the market by one timestep."""
         derived_supply, derived_demand, solar_production, wind_production = (
             self._derive_flows(
@@ -162,7 +163,7 @@ class MarketModel:
     def _derive_flows(
         supply: float | None,
         demand: float | None,
-        households: Iterable[Dict[str, Any]] | None,
+        households: Iterable[dict[str, Any]] | None,
         solar: float | None,
         wind: float | None,
     ) -> tuple[float, float, float, float]:

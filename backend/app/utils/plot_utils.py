@@ -25,7 +25,8 @@ USAGE
 
 import logging
 import os
-from typing import Any, Dict, List, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -41,7 +42,8 @@ _DEFAULT_LOG_DIR = "logs"
 # Internal helpers
 # ===================================================================
 
-def _resolve_log_dir(log_dir: Optional[str]) -> str:
+
+def _resolve_log_dir(log_dir: str | None) -> str:
     """Return a concrete log directory, creating it if needed."""
     if log_dir is None:
         log_dir = _DEFAULT_LOG_DIR
@@ -50,10 +52,10 @@ def _resolve_log_dir(log_dir: Optional[str]) -> str:
 
 
 def _prepare_dataframe(
-    logs: List[Dict[str, Any]],
+    logs: list[dict[str, Any]],
     required_columns: Sequence[str],
     sort_by: str = "timestamp",
-) -> Optional[pd.DataFrame]:
+) -> pd.DataFrame | None:
     """
     Convert logs to a DataFrame and validate required columns.
 
@@ -135,8 +137,8 @@ _SIMULATION_COLUMNS = [
 
 
 def plot_rewards(
-    logs: List[Dict[str, Any]],
-    log_dir: Optional[str] = None,
+    logs: list[dict[str, Any]],
+    log_dir: str | None = None,
     filename: str = "rewards_plot.png",
 ) -> None:
     """
@@ -172,8 +174,8 @@ def plot_rewards(
 
 
 def plot_simulation_data(
-    logs: List[Dict[str, Any]],
-    log_dir: Optional[str] = None,
+    logs: list[dict[str, Any]],
+    log_dir: str | None = None,
     filename: str = "simulation_data_plot.png",
 ) -> None:
     """
@@ -209,10 +211,10 @@ def plot_simulation_data(
 
 
 def plot_state_distribution(
-    logs: List[Dict[str, Any]],
-    log_dir: Optional[str] = None,
+    logs: list[dict[str, Any]],
+    log_dir: str | None = None,
     filename_suffix: str = "state_over_time.png",
-    column_filter: Optional[List[str]] = None,
+    column_filter: list[str] | None = None,
 ) -> None:
     """
     Plot time-series for selected state variables.
@@ -238,8 +240,7 @@ def plot_state_distribution(
         state_vars = [c for c in column_filter if c in df.columns]
     else:
         state_vars = [
-            c for c in df.select_dtypes(include="number").columns
-            if c != "timestamp"
+            c for c in df.select_dtypes(include="number").columns if c != "timestamp"
         ]
 
     if not state_vars:
@@ -266,10 +267,10 @@ def plot_state_distribution(
 
 
 def plot_all(
-    training_logs: Optional[List[Dict[str, Any]]] = None,
-    simulation_logs: Optional[List[Dict[str, Any]]] = None,
-    state_logs: Optional[List[Dict[str, Any]]] = None,
-    log_dir: Optional[str] = None,
+    training_logs: list[dict[str, Any]] | None = None,
+    simulation_logs: list[dict[str, Any]] | None = None,
+    state_logs: list[dict[str, Any]] | None = None,
+    log_dir: str | None = None,
 ) -> None:
     """
     Plot all available log types.
@@ -297,9 +298,10 @@ def plot_all(
 # Generic plots
 # ===================================================================
 
+
 def plot_histogram(
-    data: List[float],
-    log_dir: Optional[str] = None,
+    data: list[float],
+    log_dir: str | None = None,
     filename: str = "histogram.png",
     title: str = "Histogram",
     xlabel: str = "Value",
@@ -320,9 +322,9 @@ def plot_histogram(
 
 
 def plot_scatter(
-    x: List[float],
-    y: List[float],
-    log_dir: Optional[str] = None,
+    x: list[float],
+    y: list[float],
+    log_dir: str | None = None,
     filename: str = "scatter_plot.png",
     title: str = "Scatter Plot",
     xlabel: str = "X",

@@ -1,12 +1,12 @@
-import random
 import logging
+import random
 from datetime import datetime
-from typing import Any, List, Dict, Tuple
+from typing import Any
 
+import networkx as nx
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import networkx as nx
 
 from app.core.project_config import config
 from app.infrastructure.graph_utils import get_edges, get_node_types
@@ -133,7 +133,9 @@ class GNNCoordinator:
                     (
                         1.0
                         if node_types[node] == "household"
-                        else 2.0 if node_types[node] == "solar" else 3.0
+                        else 2.0
+                        if node_types[node] == "solar"
+                        else 3.0
                     )
                     for node in sorted_nodes
                 ],
@@ -159,7 +161,7 @@ class GNNCoordinator:
         ).unsqueeze(1)
         return edge_weights.to(self.device)
 
-    def _get_graph_data(self) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _get_graph_data(self) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Prepares node features and edge index for the GNN model.
         """
@@ -192,7 +194,7 @@ class GNNCoordinator:
         return None
 
     def compute_coordination_signals(
-        self, house_states: List[Any], graph: nx.Graph, weather_data: Any
+        self, house_states: list[Any], graph: nx.Graph, weather_data: Any
     ) -> Any:
         """
         Computes coordination signals for households based on current state and weather.

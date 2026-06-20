@@ -39,7 +39,9 @@ async def simulation_stream(websocket: WebSocket) -> None:
             if isinstance(data, str):
                 await websocket.send_text(data)
             else:
-                await websocket.send_text(json.dumps({"type": "unknown", "payload": data}))
+                await websocket.send_text(
+                    json.dumps({"type": "unknown", "payload": data})
+                )
     except WebSocketDisconnect:
         return
     finally:

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping, MutableMapping
 from pathlib import Path
-from typing import Any, Dict, Iterator, Mapping, MutableMapping
+from typing import Any
 
 import yaml
-
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CONFIG_DIR = _PROJECT_ROOT / "config"
@@ -17,7 +17,7 @@ class ConfigProxy(Mapping[str, Any]):
     """Read-only config view supporting both dict and attribute access."""
 
     def __init__(self, data: Mapping[str, Any]):
-        self._data: Dict[str, Any] = dict(data)
+        self._data: dict[str, Any] = dict(data)
 
     def __getitem__(self, key: str) -> Any:
         return self._wrap(self._data[key])
@@ -38,7 +38,7 @@ class ConfigProxy(Mapping[str, Any]):
             return default
         return self._wrap(self._data[key])
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return dict(self._data)
 
     @staticmethod
@@ -56,7 +56,7 @@ def _deep_merge(base: MutableMapping[str, Any], override: Mapping[str, Any]) -> 
         base[key] = value
 
 
-def _load_yaml_file(path: Path) -> Dict[str, Any]:
+def _load_yaml_file(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     with path.open("r", encoding="utf-8") as f:
@@ -66,9 +66,9 @@ def _load_yaml_file(path: Path) -> Dict[str, Any]:
     return data
 
 
-def load_project_config(config_dir: Path | None = None) -> Dict[str, Any]:
+def load_project_config(config_dir: Path | None = None) -> dict[str, Any]:
     root = config_dir or _CONFIG_DIR
-    merged: Dict[str, Any] = {}
+    merged: dict[str, Any] = {}
 
     for filename in _CONFIG_FILES:
         _deep_merge(merged, _load_yaml_file(root / filename))

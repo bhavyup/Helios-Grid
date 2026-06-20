@@ -1268,11 +1268,14 @@ function EnergyArcFlow({
 
   const dist = Math.hypot(target[0] - source[0], target[2] - source[2]);
   const lift = 0.45 + dist * 0.085;
-  const mid: [number, number, number] = [
-    (source[0] + target[0]) / 2,
-    lift,
-    (source[2] + target[2]) / 2,
-  ];
+  const mid = useMemo<[number, number, number]>(
+    () => [
+      (source[0] + target[0]) / 2,
+      lift,
+      (source[2] + target[2]) / 2,
+    ],
+    [source, target, lift],
+  );
 
   const qty = link.quantity ?? 0.25;
 
@@ -1294,17 +1297,7 @@ function EnergyArcFlow({
       new THREE.Vector3(...mid),
       new THREE.Vector3(...target),
     );
-  }, [
-    source[0],
-    source[1],
-    source[2],
-    mid[0],
-    mid[1],
-    mid[2],
-    target[0],
-    target[1],
-    target[2],
-  ]);
+  }, [source, mid, target]);
 
   // temp objects for instancing
   const tmp = useMemo(() => {
@@ -2544,7 +2537,10 @@ function SceneGraph({
       positionedNodes.find((node) => node.asset_class === "grid"),
     [positionedNodes],
   );
-  const hubPosition = gridNode?.position ?? [0, 0, 0];
+  const hubPosition = useMemo<[number, number, number]>(
+    () => gridNode?.position ?? [0, 0, 0],
+    [gridNode],
+  );
   const cycle = useMemo(
     () => resolveDayCycle(latestInfo, step),
     [latestInfo, step],

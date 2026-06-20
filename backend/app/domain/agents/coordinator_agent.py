@@ -3,8 +3,8 @@ CoordinatorAgent -- Grid simulation orchestrator.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
@@ -31,8 +31,8 @@ class CoordinatorAgent:
         num_solar_panels: int = 5,
         num_wind_turbines: int = 3,
         log_dir: str = config.LOG_DIR,
-        comm_layer: Optional[Any] = None,
-        seed: Optional[int] = None,
+        comm_layer: Any | None = None,
+        seed: int | None = None,
     ):
         self.num_households = num_households
         self.num_solar_panels = num_solar_panels
@@ -49,7 +49,7 @@ class CoordinatorAgent:
             num_wind_turbines=num_wind_turbines,
         )
 
-        gnn_kwargs: Dict[str, Any] = {
+        gnn_kwargs: dict[str, Any] = {
             "graph": topology_graph,
             "log_dir": log_dir,
         }
@@ -57,7 +57,7 @@ class CoordinatorAgent:
             gnn_kwargs["seed"] = seed
         self.gnn_coordinator = GNNCoordinator(**gnn_kwargs)
 
-        market_kwargs: Dict[str, Any] = {
+        market_kwargs: dict[str, Any] = {
             "num_households": num_households,
             "num_solar_panels": num_solar_panels,
             "num_wind_turbines": num_wind_turbines,
@@ -94,7 +94,7 @@ class CoordinatorAgent:
 
             self.current_time = step
 
-            households: List[Dict[str, float]] = [
+            households: list[dict[str, float]] = [
                 {"consumption": float(self.rng.rand())}
                 for _ in range(self.num_households)
             ]
@@ -102,7 +102,7 @@ class CoordinatorAgent:
             wind = float(self.rng.rand())
 
             try:
-                market_data: Dict[str, Any] = self.market_model.step(
+                market_data: dict[str, Any] = self.market_model.step(
                     households=households,
                     solar=solar,
                     wind=wind,
@@ -117,7 +117,7 @@ class CoordinatorAgent:
             state = self._market_data_to_state(market_data)
             decision = self.make_decision(state)
 
-            timestamp = datetime.now(tz=timezone.utc).isoformat()
+            timestamp = datetime.now(tz=UTC).isoformat()
 
             if self._comm_layer is None:
                 log_simulation_data(
@@ -125,29 +125,25 @@ class CoordinatorAgent:
                     timestamp=timestamp,
                     grid_balance=market_data.get("grid_balance", 0.0),
                     market_balance=market_data.get("market_balance", 0.0),
-                    household_consumption=market_data.get(
-                        "household_consumption", 0.0
-                    ),
+                    household_consumption=market_data.get("household_consumption", 0.0),
                     solar_production=market_data.get("solar_production", 0.0),
                     wind_production=market_data.get("wind_production", 0.0),
                 )
             else:
-                self._comm_layer.send_message({
-                    "component_type": "grid",
-                    "timestamp": timestamp,
-                    "grid_balance": market_data.get("grid_balance", 0.0),
-                    "market_balance": market_data.get("market_balance", 0.0),
-                    "household_consumption": market_data.get(
-                        "household_consumption", 0.0
-                    ),
-                    "solar_production": market_data.get(
-                        "solar_production", 0.0
-                    ),
-                    "wind_production": market_data.get(
-                        "wind_production", 0.0
-                    ),
-                    "decision": decision,
-                })
+                self._comm_layer.send_message(
+                    {
+                        "component_type": "grid",
+                        "timestamp": timestamp,
+                        "grid_balance": market_data.get("grid_balance", 0.0),
+                        "market_balance": market_data.get("market_balance", 0.0),
+                        "household_consumption": market_data.get(
+                            "household_consumption", 0.0
+                        ),
+                        "solar_production": market_data.get("solar_production", 0.0),
+                        "wind_production": market_data.get("wind_production", 0.0),
+                        "decision": decision,
+                    }
+                )
 
             logger.info(
                 "Step %d/%d complete | balance=%.4f | decision=%s",
@@ -157,7 +153,7 @@ class CoordinatorAgent:
                 decision.get("action", "unknown"),
             )
 
-    def make_decision(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def make_decision(self, state: dict[str, Any]) -> dict[str, Any]:
         grid_balance = state.get("grid_balance", 0.0)
 
         if grid_balance > 0:
@@ -166,24 +162,16 @@ class CoordinatorAgent:
             return {"action": "decrease_price", "value": -0.05}
         return {"action": "maintain_price", "value": 0.0}
 
-    def get_grid_state(self) -> Dict[str, Any]:
+    def get_grid_state(self) -> dict[str, Any]:
         return {
             "current_time": self.current_time,
-            "grid_balance": getattr(
-                self.market_model, "grid_balance", 0.0
-            ),
-            "market_balance": getattr(
-                self.market_model, "market_balance", 0.0
-            ),
+            "grid_balance": getattr(self.market_model, "grid_balance", 0.0),
+            "market_balance": getattr(self.market_model, "market_balance", 0.0),
             "household_consumption": getattr(
                 self.market_model, "household_consumption", 0.0
             ),
-            "solar_production": getattr(
-                self.market_model, "solar_production", 0.0
-            ),
-            "wind_production": getattr(
-                self.market_model, "wind_production", 0.0
-            ),
+            "solar_production": getattr(self.market_model, "solar_production", 0.0),
+            "wind_production": getattr(self.market_model, "wind_production", 0.0),
         }
 
     def stop(self) -> None:
@@ -197,10 +185,10 @@ class CoordinatorAgent:
 
     @staticmethod
     def _fallback_market_step(
-        households: List[Dict[str, float]],
+        households: list[dict[str, float]],
         solar: float,
         wind: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         household_consumption = float(
             sum(h.get("consumption", 0.0) for h in households)
         )
@@ -215,14 +203,12 @@ class CoordinatorAgent:
 
     @staticmethod
     def _market_data_to_state(
-        market_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        market_data: dict[str, Any],
+    ) -> dict[str, Any]:
         return {
             "grid_balance": market_data.get("grid_balance", 0.0),
             "market_balance": market_data.get("market_balance", 0.0),
-            "household_consumption": market_data.get(
-                "household_consumption", 0.0
-            ),
+            "household_consumption": market_data.get("household_consumption", 0.0),
             "solar_production": market_data.get("solar_production", 0.0),
             "wind_production": market_data.get("wind_production", 0.0),
         }

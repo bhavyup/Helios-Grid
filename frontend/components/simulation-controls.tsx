@@ -13,7 +13,7 @@ import {
   Sparkles,
   StepForward,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CsvProfilePayload,
@@ -40,6 +40,34 @@ type ControlTab =
   | "market"
   | "inspect"
   | "automation";
+
+const findIrradianceAlternative = (
+  columns: string[],
+  excluded: string,
+): string => {
+  const candidates = columns.filter(
+    (column) => column.toLowerCase() !== excluded.toLowerCase(),
+  );
+  return (
+    candidates.find((column) =>
+      /irradiance|solar_irradiance|ghi|dni|dhi/i.test(column),
+    ) ?? ""
+  );
+};
+
+const findPvPowerAlternative = (
+  columns: string[],
+  excluded: string,
+): string => {
+  const candidates = columns.filter(
+    (column) => column.toLowerCase() !== excluded.toLowerCase(),
+  );
+  return (
+    candidates.find((column) =>
+      /pv_power|pv_generation|pv_output|generation/i.test(column),
+    ) ?? ""
+  );
+};
 
 interface SimulationControlsProps {
   mode: PolicyMode;
@@ -548,6 +576,7 @@ export function SimulationControls({
 
   const [householdPath, setHouseholdPath] = useState("");
   const [marketPath, setMarketPath] = useState("");
+  const [WeatherPath, setWeatherPath] = useState("");
 
   const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(
     null,
@@ -672,7 +701,7 @@ export function SimulationControls({
     );
 
     const consumption = columns.find((c) =>
-      /consump|consumption|demand|load/i.test(c),
+      /consump|consumption|load/i.test(c),
     );
     const householdId = columns.find((c) =>
       /household_id|household|meter_id|customer_id/i.test(c),
@@ -686,6 +715,8 @@ export function SimulationControls({
     const price = columns.find((c) =>
       /price|market_price|price_usd|price_eur/i.test(c),
     );
+    const supply = columns.find((c) => /supply/i.test(c));
+    const demand = columns.find((c) => /demand/i.test(c));
     const ask = columns.find((c) => /ask/i.test(c));
     const bid = columns.find((c) => /bid/i.test(c));
     const quantity = columns.find((c) => /quantity|qty|volume/i.test(c));
@@ -713,6 +744,8 @@ export function SimulationControls({
       bid,
       quantity,
       clearingPrice,
+      supply,
+      demand,
     };
   }, [csvProfile]);
 
@@ -746,6 +779,8 @@ export function SimulationControls({
         "pv",
         "meter",
         "demand",
+        "timestamp",
+        "utc_timestamp",
       ],
       market: [
         "price",
@@ -755,6 +790,10 @@ export function SimulationControls({
         "clearing_price",
         "price_usd",
         "price_eur",
+        "timestamp",
+        "utc_timestamp",
+        "supply",
+        "demand",
       ],
     };
 
@@ -798,69 +837,7 @@ export function SimulationControls({
     }
     lastProfileAutoFillRef.current = profileKey;
 
-    // Reset role-specific mappings when a new CSV profile arrives.
-    setSolarColumnInput("");
-    setWindColumnInput("");
-    setTimestampColumnInput("");
-    setTemperatureColumnInput("");
-    setHumidityColumnInput("");
-    setGhiColumnInput("");
-    setDniColumnInput("");
-    setDhiColumnInput("");
-    setIrradianceColumnInput("");
-    setPvPowerColumnInput("");
-    setConsumptionColumnInput("");
-    setHouseholdIdColumnInput("");
-    setPvGenerationColumnInput("");
-    setNetLoadColumnInput("");
-    setMeterColumnInput("");
-    setDemandColumnInput("");
-    setPriceColumnInput("");
-    setAskColumnInput("");
-    setBidColumnInput("");
-    setQuantityColumnInput("");
-    setClearingPriceColumnInput("");
-
-    const columns = csvProfile.columns ?? [];
-    let nextIrradiance = suggestedColumns.irradiance ?? "";
-    let nextPvPower = suggestedColumns.pvPower ?? "";
-
-    warningDetails.forEach((warning) => {
-      const flagged = warning.column?.trim();
-      if (!flagged || flagged === "unknown") {
-        return;
-      }
-
-      if (warning.kind === "likely_generation_not_irradiance") {
-        if (nextIrradiance.toLowerCase() === flagged.toLowerCase()) {
-          if (!nextPvPower) {
-            nextPvPower = flagged;
-          }
-          nextIrradiance = findIrradianceAlternative(columns, flagged);
-        }
-      }
-
-      if (warning.kind === "likely_irradiance_not_generation") {
-        if (nextPvPower.toLowerCase() === flagged.toLowerCase()) {
-          if (!nextIrradiance) {
-            nextIrradiance = flagged;
-          }
-          nextPvPower = findPvPowerAlternative(columns, flagged);
-        }
-      }
-    });
-
-    setSolarColumnInput(suggestedColumns.solar ?? "");
-    setWindColumnInput(suggestedColumns.wind ?? "");
-    setTimestampColumnInput(suggestedColumns.timestamp ?? "");
-    setTemperatureColumnInput(suggestedColumns.temperature ?? "");
-    setHumidityColumnInput(suggestedColumns.humidity ?? "");
-    setGhiColumnInput(suggestedColumns.ghi ?? "");
-    setDniColumnInput(suggestedColumns.dni ?? "");
-    setDhiColumnInput(suggestedColumns.dhi ?? "");
-    setIrradianceColumnInput(nextIrradiance);
-    setPvPowerColumnInput(nextPvPower);
-
+    // Default solar panel parameters if the user has not entered any yet.
     if (!panelTiltInput) {
       setPanelTiltInput("30");
     }
@@ -883,9 +860,6 @@ export function SimulationControls({
     panelAreaInput,
     panelEfficiencyInput,
     tempCoefficientInput,
-    suggestedColumns,
-    warningSignature,
-    warningDetails,
   ]);
 
   useEffect(() => {
@@ -952,7 +926,7 @@ export function SimulationControls({
       return;
     }
 
-    setCsvPath(uploadedWeather.resolved_path);
+    setWeatherPath(uploadedWeather.resolved_path);
     setWeatherSourceMode("upload");
     setSelectedUploadFile(null);
   }, [uploadedWeather]);
@@ -962,7 +936,7 @@ export function SimulationControls({
       return;
     }
 
-    setCsvPath(derivedWeather.output_file_path);
+    setWeatherPath(derivedWeather.output_file_path);
     setWeatherSourceMode("path");
   }, [derivedWeather?.output_file_path]);
 
@@ -993,29 +967,20 @@ export function SimulationControls({
   }, [derivedMarket?.output_file_path]);
 
   const resolvedWeatherPath =
-    weatherSourceMode === "default"
-      ? undefined
-      : weatherSourceMode === "upload"
-        ? (uploadedWeather?.resolved_path ??
-          (csvPath.trim().length > 0 ? csvPath.trim() : undefined))
-        : csvPath.trim().length > 0
-          ? csvPath.trim()
-          : undefined;
+    weatherSourceMode === "upload"
+      ? (uploadedWeather?.resolved_path ?? (WeatherPath.trim() || undefined))
+      : WeatherPath.trim() || undefined;
 
   const resolvedHouseholdPath =
-    householdSourceMode === "default"
-      ? undefined
-      : householdSourceMode === "upload"
-        ? (uploadedHousehold?.resolved_path ??
-          (householdPath.trim() || undefined))
-        : householdPath.trim() || undefined;
+    householdSourceMode === "upload"
+      ? (uploadedHousehold?.resolved_path ??
+        (householdPath.trim() || undefined))
+      : householdPath.trim() || undefined;
 
   const resolvedMarketPath =
-    marketSourceMode === "default"
-      ? undefined
-      : marketSourceMode === "upload"
-        ? (uploadedMarket?.resolved_path ?? (marketPath.trim() || undefined))
-        : marketPath.trim() || undefined;
+    marketSourceMode === "upload"
+      ? (uploadedMarket?.resolved_path ?? (marketPath.trim() || undefined))
+      : marketPath.trim() || undefined;
 
   const parseOptionalInt = (
     value: string,
@@ -1080,11 +1045,33 @@ export function SimulationControls({
     const { parsedHouseholds, parsedMaxEpisodeSteps } = resolveResetInputs();
     await onReset({
       seed: parsedSeed,
-      weatherDataPath: csvProfile.resolved_path,
+      weatherDataPath:
+        effectiveRole === "weather"
+          ? csvProfile.resolved_path
+          : resolvedWeatherPath,
+      householdDataPath:
+        effectiveRole === "household"
+          ? csvProfile.resolved_path
+          : resolvedHouseholdPath,
+      marketDataPath:
+        effectiveRole === "market"
+          ? csvProfile.resolved_path
+          : resolvedMarketPath,
       numHouseholds: parsedHouseholds,
       maxEpisodeSteps: parsedMaxEpisodeSteps,
     });
-    setWeatherSourceMode("path");
+    if (effectiveRole === "weather") {
+      setWeatherSourceMode("path");
+      setWeatherPath(csvProfile.resolved_path);
+    }
+    if (effectiveRole === "household") {
+      setHouseholdSourceMode("path");
+      setHouseholdPath(csvProfile.resolved_path);
+    }
+    if (effectiveRole === "market") {
+      setMarketSourceMode("path");
+      setMarketPath(csvProfile.resolved_path);
+    }
     setCsvPath(csvProfile.resolved_path);
   };
 
@@ -1189,11 +1176,62 @@ export function SimulationControls({
     await onReset({
       seed: parsedSeed,
       weatherDataPath: derivedWeather.output_file_path,
+      householdDataPath: resolvedHouseholdPath,
+      marketDataPath: resolvedMarketPath,
       numHouseholds: parsedHouseholds,
       maxEpisodeSteps: parsedMaxEpisodeSteps,
     });
     setWeatherSourceMode("path");
     setCsvPath(derivedWeather.output_file_path);
+    setWeatherPath(derivedWeather.output_file_path);
+  };
+
+  const handleResetWithDerivedHousehold = async () => {
+    if (!derivedHousehold?.output_file_path) {
+      return;
+    }
+
+    const maybeSeed =
+      seedInput.trim().length > 0 ? Number(seedInput) : undefined;
+    const parsedSeed = Number.isFinite(maybeSeed ?? NaN)
+      ? maybeSeed
+      : undefined;
+    const { parsedHouseholds, parsedMaxEpisodeSteps } = resolveResetInputs();
+    await onReset({
+      seed: parsedSeed,
+      weatherDataPath: resolvedWeatherPath,
+      marketDataPath: resolvedMarketPath,
+      householdDataPath: derivedHousehold.output_file_path,
+      numHouseholds: parsedHouseholds,
+      maxEpisodeSteps: parsedMaxEpisodeSteps,
+    });
+    setHouseholdSourceMode("path");
+    setCsvPath(derivedHousehold.output_file_path);
+    setHouseholdPath(derivedHousehold.output_file_path);
+  };
+
+  const handleResetWithDerivedMarket = async () => {
+    if (!derivedMarket?.output_file_path) {
+      return;
+    }
+
+    const maybeSeed =
+      seedInput.trim().length > 0 ? Number(seedInput) : undefined;
+    const parsedSeed = Number.isFinite(maybeSeed ?? NaN)
+      ? maybeSeed
+      : undefined;
+    const { parsedHouseholds, parsedMaxEpisodeSteps } = resolveResetInputs();
+    await onReset({
+      seed: parsedSeed,
+      weatherDataPath: resolvedWeatherPath,
+      householdDataPath: resolvedHouseholdPath,
+      marketDataPath: derivedMarket.output_file_path,
+      numHouseholds: parsedHouseholds,
+      maxEpisodeSteps: parsedMaxEpisodeSteps,
+    });
+    setMarketSourceMode("path");
+    setCsvPath(derivedMarket.output_file_path);
+    setMarketPath(derivedMarket.output_file_path);
   };
 
   // expose derived column mapping to user by showing a compact summary
@@ -1204,6 +1242,38 @@ export function SimulationControls({
       .map(([k, v]) => `${k} <-- ${v}`);
     return entries.length > 0 ? entries.join(" · ") : null;
   }, [derivedWeather]);
+
+  const derivedHouseholdMappingSummary = useMemo(() => {
+    if (!derivedHousehold?.column_mapping) return null;
+    const entries = Object.entries(derivedHousehold.column_mapping)
+      .filter(([, v]) => v !== null && v !== undefined && v !== "")
+      .map(([k, v]) => `${k} <-- ${v}`);
+    return entries.length > 0 ? entries.join(" · ") : null;
+  }, [derivedHousehold]);
+
+  const derivedMarketMappingSummary = useMemo(() => {
+    if (!derivedMarket?.column_mapping) return null;
+    const entries = Object.entries(derivedMarket.column_mapping)
+      .filter(([, v]) => v !== null && v !== undefined && v !== "")
+      .map(([k, v]) => `${k} <-- ${v}`);
+    return entries.length > 0 ? entries.join(" · ") : null;
+  }, [derivedMarket]);
+
+  const setCSVPathAfterUpload = (type: "weather" | "household" | "market") => {
+    if (type === "weather") {
+      setCsvPath(uploadedWeather?.resolved_path ?? "");
+      setWeatherPath(uploadedWeather?.resolved_path ?? "");
+      setWeatherSourceMode("upload");
+    } else if (type === "household") {
+      setCsvPath(uploadedHousehold?.resolved_path ?? "");
+      setHouseholdPath(uploadedHousehold?.resolved_path ?? "");
+      setHouseholdSourceMode("upload");
+    } else if (type === "market") {
+      setCsvPath(uploadedMarket?.resolved_path ?? "");
+      setMarketPath(uploadedMarket?.resolved_path ?? "");
+      setMarketSourceMode("upload");
+    }
+  };
 
   const warningByColumn = useMemo(() => {
     const map = new Map<string, (typeof warningDetails)[number]>();
@@ -1218,35 +1288,7 @@ export function SimulationControls({
   const getWarningForValue = (value: string) =>
     warningByColumn.get(value.trim().toLowerCase()) ?? null;
 
-  const findIrradianceAlternative = (
-    columns: string[],
-    excluded: string,
-  ): string => {
-    const candidates = columns.filter(
-      (column) => column.toLowerCase() !== excluded.toLowerCase(),
-    );
-    return (
-      candidates.find((column) =>
-        /irradiance|solar_irradiance|ghi|dni|dhi/i.test(column),
-      ) ?? ""
-    );
-  };
-
-  const findPvPowerAlternative = (
-    columns: string[],
-    excluded: string,
-  ): string => {
-    const candidates = columns.filter(
-      (column) => column.toLowerCase() !== excluded.toLowerCase(),
-    );
-    return (
-      candidates.find((column) =>
-        /pv_power|pv_generation|pv_output|generation/i.test(column),
-      ) ?? ""
-    );
-  };
-
-  const applySmartAutoFillFromProfile = () => {
+  const applySmartAutoFillFromProfile = useCallback(() => {
     if (!csvProfile) {
       return;
     }
@@ -1257,6 +1299,18 @@ export function SimulationControls({
     const nextTimestamp = suggestedColumns.timestamp ?? "";
     const nextTemperature = suggestedColumns.temperature ?? "";
     const nextHumidity = suggestedColumns.humidity ?? "";
+    const consumption = suggestedColumns.consumption ?? "";
+    const householdId = suggestedColumns.householdId ?? "";
+    const pvGeneration = suggestedColumns.pvGeneration ?? "";
+    const netLoad = suggestedColumns.netLoad ?? "";
+    const price = suggestedColumns.price ?? "";
+    const ask = suggestedColumns.ask ?? "";
+    const bid = suggestedColumns.bid ?? "";
+    const supply = suggestedColumns.supply ?? "";
+    const demand = suggestedColumns.demand ?? "";
+    const quantity = suggestedColumns.quantity ?? "";
+    const clearingPrice = suggestedColumns.clearingPrice ?? "";
+
     let nextGhi = suggestedColumns.ghi ?? "";
     let nextDni = suggestedColumns.dni ?? "";
     let nextDhi = suggestedColumns.dhi ?? "";
@@ -1303,7 +1357,29 @@ export function SimulationControls({
     setDhiColumnInput(nextDhi);
     setIrradianceColumnInput(nextIrradiance);
     setPvPowerColumnInput(nextPvPower);
-  };
+    setConsumptionColumnInput(consumption);
+    setHouseholdIdColumnInput(householdId);
+    setPvGenerationColumnInput(pvGeneration);
+    setNetLoadColumnInput(netLoad);
+    setPriceColumnInput(price);
+    setAskColumnInput(ask);
+    setBidColumnInput(bid);
+    setSupplyColumnInput(supply);
+    setMarketDemandColumnInput(demand);
+    setQuantityColumnInput(quantity);
+    setClearingPriceColumnInput(clearingPrice);
+  }, [csvProfile, suggestedColumns, warningDetails]);
+
+  useEffect(() => {
+    if (!csvProfile) {
+      return;
+    }
+    const profileKey = `${csvProfile.resolved_path}|${csvProfile.selected_role}|${csvProfile.columns.join("|")}`;
+    if (lastProfileAutoFillRef.current === profileKey) {
+      return;
+    }
+    applySmartAutoFillFromProfile();
+  }, [applySmartAutoFillFromProfile, csvProfile]);
 
   const applySafeWeatherFixes = (): void => {
     applySmartAutoFillFromProfile();
@@ -1847,17 +1923,8 @@ export function SimulationControls({
                     : "No reset path resolved"}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-slate-300 break-all">
-                  {resolvedWeatherPath ? (
-                    <>
-                      The sim will reset against this path:{" "}
-                      <span className="text-slate-100 hover:underline hover:cursor-pointer">
-                        {resolvedWeatherPath}
-                      </span>{" "}
-                      on the next reset action.
-                    </>
-                  ) : (
-                    "Choose a source and enter a path to set the reset target explicitly."
-                  )}
+                  {resolvedWeatherPath ??
+                    "Choose a source and enter a path to set the reset target explicitly."}
                 </p>
               </article>
             </div>
@@ -1869,7 +1936,7 @@ export function SimulationControls({
                 <div>
                   <p className="section-eyebrow">Path intake</p>
                   <h3 className="mt-2 text-lg font-semibold text-white">
-                    Resolve the selected source path.
+                    Resolve the selected weather path.
                   </h3>
                 </div>
                 <span className="max-w-[300px] overflow-auto modern-scrollbar rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-300">
@@ -1882,15 +1949,15 @@ export function SimulationControls({
               <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px]">
                 <SearchablePathInput
                   label="Weather path"
-                  value={csvPath}
+                  value={WeatherPath}
                   options={backendCsvPathOptions}
                   placeholder="Type or choose a backend CSV path"
                   disabled={weatherSourceMode === "default"}
                   onChange={(nextValue) => {
-                    setCsvPath(nextValue);
                     setWeatherSourceMode(
                       nextValue.trim().length > 0 ? "path" : weatherSourceMode,
                     );
+                    setWeatherPath(nextValue);
                   }}
                 />
 
@@ -1958,7 +2025,10 @@ export function SimulationControls({
                     <p className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-orange-300">
                       Make sure to{" "}
                       <span
-                        onClick={() => setActiveTab("inspect")}
+                        onClick={() => {
+                          setActiveTab("inspect");
+                          setCSVPathAfterUpload("weather");
+                        }}
                         className=" underline cursor-pointer hover:text-emerald-200"
                       >
                         Analyze/Profile
@@ -1978,13 +2048,15 @@ export function SimulationControls({
                     Weather profile
                   </p>
                   <p className="mt-2 text-sm font-semibold text-white">
-                    {csvProfile?.requested_role === "weather" &&
+                    {(csvProfile?.requested_role === "weather" ||
+                      csvProfile?.inferred_role === "weather") &&
                     csvProfile?.can_use_now
                       ? "Runtime ready"
                       : "Profile first then derive"}
                   </p>
                   <p className="mt-1 text-sm leading-6 text-slate-300">
-                    {csvProfile?.requested_role === "weather"
+                    {csvProfile?.requested_role === "weather" ||
+                    csvProfile?.inferred_role === "weather"
                       ? csvProfile?.usage_recommendation
                       : "Profile a CSV to verify the schema before it becomes the reset source."}
                   </p>
@@ -2191,29 +2263,83 @@ export function SimulationControls({
                     </button>
                   </div>
                 ) : null}
-              </div>
+                {/* </div> */}
 
-              {uploadedHousehold ? (
-                <p className="mt-3 text-[10px] text-emerald-100 break-all">
-                  Uploaded:{" "}
-                  <span className="font-mono">
-                    {uploadedHousehold.resolved_path}
-                  </span>
-                </p>
-              ) : null}
+                {uploadedHousehold ? (
+                  <p className="mt-3 text-[10px] text-emerald-100 break-all">
+                    Uploaded:{" "}
+                    <span className="font-mono">
+                      {uploadedHousehold.resolved_path}
+                    </span>
+                  </p>
+                ) : null}
+
+                {uploadedHousehold ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                      Upload ready
+                    </span>
+                    <p className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-orange-300">
+                      Make sure to{" "}
+                      <span
+                        onClick={() => {
+                          setActiveTab("inspect");
+                          setCSVPathAfterUpload("household");
+                        }}
+                        className=" underline cursor-pointer hover:text-emerald-200"
+                      >
+                        Analyze/Profile
+                      </span>{" "}
+                      the CSV first to validate the schema.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="panel-frame rounded-[1.35rem] p-5">
-              <p className="section-eyebrow">Derived household</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                {derivedHousehold?.usage_recommendation ??
-                  "Derive a canonical household CSV in Inspect (optional)."}
-              </p>
-              {derivedHousehold?.output_file_path ? (
-                <p className="mt-2 text-xs break-all text-slate-300 font-mono">
-                  {derivedHousehold.output_file_path}
-                </p>
-              ) : null}
+              <p className="section-eyebrow">Household State</p>
+              <div className="mt-3 flex flex-col gap-3">
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Household profile
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-white">
+                    {(csvProfile?.requested_role === "household" ||
+                      csvProfile?.inferred_role === "household") &&
+                    csvProfile?.can_use_now
+                      ? "Runtime ready"
+                      : "Profile first then derive"}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">
+                    {csvProfile?.requested_role === "household"
+                      ? csvProfile?.usage_recommendation
+                      : "Profile a CSV to verify the schema before it becomes the reset source."}
+                  </p>
+                </article>
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Derived Household
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-white">
+                    {derivedHousehold?.output_file_path
+                      ? "Derived Successfully"
+                      : "Not derived yet"}
+                  </p>
+                  {derivedHouseholdMappingSummary ? (
+                    <p className="mt-2 text-xs flex text-slate-400 whitespace-pre-wrap">
+                      Mapped:{" "}
+                      <span className="text-slate-100">
+                        {derivedHouseholdMappingSummary.split(" · ").join("\n")}
+                      </span>
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-sm leading-6 text-slate-300">
+                    {derivedHousehold?.usage_recommendation ??
+                      "Use the inspect tab to map source columns and derive a runtime-ready CSV."}
+                  </p>
+                </article>
+              </div>
             </div>
           </section>
         </div>
@@ -2268,10 +2394,61 @@ export function SimulationControls({
             </div>
 
             <div className="panel-frame rounded-[1.35rem] p-5">
-              <p className="section-eyebrow">Reset path</p>
-              <p className="mt-2 text-xs break-all leading-6 text-slate-300">
-                {resolvedMarketPath ?? "Synthetic baseline (no market CSV)."}
-              </p>
+              <p className="section-eyebrow">Source map</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Bundled default
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Good for quick resets and demo execution without extra file
+                    handling.
+                  </p>
+                </article>
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Existing path
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Use already uploaded or derived backend paths when they
+                    exist.
+                  </p>
+                </article>
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Upload local CSV
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Send a local file to the backend, then reset against the
+                    resolved path.
+                  </p>
+                </article>
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Reset path
+                  </p>
+                  <p className="mt-2 text-xs break-all leading-6 text-slate-300">
+                    Choose a mode and enter a path to make the reset target
+                    explicit.
+                  </p>
+                </article>
+              </div>
+            </div>
+
+            <div className="panel-frame rounded-[1.35rem] p-5">
+              <p className="section-eyebrow">Resolved Reset path</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2"></div>
+              <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                <p className="mt-2 text-sm font-semibold text-white">
+                  {resolvedMarketPath
+                    ? "Reset target set"
+                    : "No reset path resolved"}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-300 break-all">
+                  {resolvedMarketPath ??
+                    "Choose a source and enter a path to set the reset target explicitly."}
+                </p>
+              </article>
             </div>
           </section>
 
@@ -2354,30 +2531,83 @@ export function SimulationControls({
                     </button>
                   </div>
                 ) : null}
-              </div>
 
-              {uploadedMarket ? (
-                <p className="mt-3 text-[10px] text-emerald-100 break-all">
-                  Uploaded:{" "}
-                  <span className="font-mono">
-                    {uploadedMarket.resolved_path}
-                  </span>
-                </p>
-              ) : null}
+                {uploadedMarket ? (
+                  <p className="mt-3 text-[10px] text-emerald-100 break-all">
+                    Uploaded:{" "}
+                    <span className="font-mono">
+                      {uploadedMarket.resolved_path}
+                    </span>
+                  </p>
+                ) : null}
+
+                {uploadedMarket ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <span className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                      Upload ready
+                    </span>
+                    <p className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-orange-300">
+                      Make sure to{" "}
+                      <span
+                        onClick={() => {
+                          setActiveTab("inspect");
+                          setCSVPathAfterUpload("market");
+                        }}
+                        className=" underline cursor-pointer hover:text-emerald-200"
+                      >
+                        Analyze/Profile
+                      </span>{" "}
+                      the CSV first to validate the schema.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
-            {/* <div className="panel-frame rounded-[1.35rem] p-5">
-              <p className="section-eyebrow">Derived market</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                {derivedMarket?.usage_recommendation ??
-                  "Derive a canonical market CSV in Inspect (optional)."}
-              </p>
-              {derivedMarket?.output_file_path ? (
-                <p className="mt-2 text-xs break-all text-slate-300 font-mono">
-                  {derivedMarket.output_file_path}
-                </p>
-              ) : null}
-            </div> */}
+            <div className="panel-frame rounded-[1.35rem] p-5">
+              <p className="section-eyebrow">Market State</p>
+              <div className="mt-3 flex flex-col gap-3">
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Market profile
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-white">
+                    {(csvProfile?.requested_role === "market" ||
+                      csvProfile?.inferred_role === "market") &&
+                    csvProfile?.can_use_now
+                      ? "Runtime ready"
+                      : "Profile first then derive"}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">
+                    {csvProfile?.requested_role === "market"
+                      ? csvProfile?.usage_recommendation
+                      : "Profile a CSV to verify the schema before it becomes the reset source."}
+                  </p>
+                </article>
+                <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                    Derived Market
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-white">
+                    {derivedMarket?.output_file_path
+                      ? "Derived Successfully"
+                      : "Not derived yet"}
+                  </p>
+                  {derivedMarketMappingSummary ? (
+                    <p className="mt-2 text-xs flex text-slate-400 whitespace-pre-wrap">
+                      Mapped:{" "}
+                      <span className="text-slate-100">
+                        {derivedMarketMappingSummary.split(" · ").join("\n")}
+                      </span>
+                    </p>
+                  ) : null}
+                  <p className="mt-1 text-sm leading-6 text-slate-300">
+                    {derivedMarket?.usage_recommendation ??
+                      "Use the inspect tab to map source columns and derive a runtime-ready CSV."}
+                  </p>
+                </article>
+              </div>
+            </div>
           </section>
         </div>
       ) : null}
@@ -2810,6 +3040,30 @@ export function SimulationControls({
                     </button>
                   ) : null}
 
+                  {derivedHousehold?.output_file_path ? (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void handleResetWithDerivedHousehold()}
+                      className="inline-flex items-center gap-2 rounded-full border border-[rgba(127,182,168,0.34)] bg-[rgba(127,182,168,0.12)] px-4 py-3 text-xs font-semibold text-[#d8f2eb] transition hover:bg-[rgba(127,182,168,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Reset with derived CSV
+                    </button>
+                  ) : null}
+
+                  {derivedMarket?.output_file_path ? (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => void handleResetWithDerivedMarket()}
+                      className="inline-flex items-center gap-2 rounded-full border border-[rgba(127,182,168,0.34)] bg-[rgba(127,182,168,0.12)] px-4 py-3 text-xs font-semibold text-[#d8f2eb] transition hover:bg-[rgba(127,182,168,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Reset with derived CSV
+                    </button>
+                  ) : null}
+
                   {csvProfile?.can_use_now ? (
                     <button
                       type="button"
@@ -3044,7 +3298,7 @@ export function SimulationControls({
               </div>
             ) : null}
 
-            {effectiveRole === 'weather' && derivedWeather ? (
+            {effectiveRole === "weather" && derivedWeather ? (
               <div className="panel-frame rounded-[1.35rem] p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -3114,7 +3368,7 @@ export function SimulationControls({
               </div>
             ) : null}
 
-            {effectiveRole === 'household' && derivedHousehold ? (
+            {effectiveRole === "household" && derivedHousehold ? (
               <div className="panel-frame rounded-[1.35rem] p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -3145,8 +3399,7 @@ export function SimulationControls({
                     </p>
                     <p className="mt-2 text-2xl font-semibold text-white">
                       {(
-                        derivedHousehold.normalization.consumption_scale ??
-                        1.0
+                        derivedHousehold.normalization.consumption_scale ?? 1.0
                       ).toFixed(2)}
                     </p>
                   </article>
@@ -3155,6 +3408,54 @@ export function SimulationControls({
                   Derived Output:{" "}
                   <span className="font-mono text-emerald-100">
                     {derivedHousehold.output_file_path}
+                  </span>
+                </p>
+                <div className="flex items-center gap-2 mt-4">
+                  <span className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                    csv derived
+                  </span>
+                  <p className="rounded-full border border-emerald-100 bg-emerald-100/10 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-orange-300">
+                    use the derived output path to{" "}
+                    <span
+                      onClick={() => void handleReset()}
+                      className=" underline cursor-pointer hover:text-emerald-200"
+                    >
+                      reset/simulate
+                    </span>{" "}
+                    the sim episode.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {effectiveRole === "market" && derivedMarket ? (
+              <div className="panel-frame rounded-[1.35rem] p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="section-eyebrow">Derived output</p>
+                    <h3 className="mt-2 text-lg font-semibold text-white">
+                      Normalized market ready for reset
+                    </h3>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-slate-300">
+                    {derivedMarket.normalization.enabled ? "Normalized" : "Raw"}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <article className="rounded-[1.1rem] border border-white/10 bg-white/[0.03] px-4 py-4">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                      Rows
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-white">
+                      {derivedMarket.rows}
+                    </p>
+                  </article>
+                </div>
+                <p className="text-xs break-all text-white mt-4">
+                  Derived Output:{" "}
+                  <span className="font-mono text-emerald-100">
+                    {derivedMarket.output_file_path}
                   </span>
                 </p>
                 <div className="flex items-center gap-2 mt-4">

@@ -1,40 +1,133 @@
-# Python artifacts
+# =============================================================================
+# Python
+# =============================================================================
 **/__pycache__/
 **/*.pyc
+**/*.pyo
+**/*.pyd
 **/.pytest_cache/
 **/.mypy_cache/
+**/.ruff_cache/
+**/*.egg-info/
+**/*.egg
+**/dist/
+**/build/
+**/*.whl
+**/*.tar.gz
 
-# Local virtual environments
-backend/.venv/
+# =============================================================================
+# Virtual environments
+# =============================================================================
 .venv/
+venv/
+env/
+backend/.venv/
 
-# Setuptools metadata (generated)
-backend/*.egg-info/
-
-# Local environment files
+# =============================================================================
+# Environment & secrets
+# =============================================================================
 .env
+.env.*
+!.env.example
 backend/.env
+frontend/.env
 
-# Runtime logs
+# =============================================================================
+# Runtime logs & artifacts
+# =============================================================================
 logs/
+*.log
 backend/logs/
+backend/artifacts/
+*.csv
 
-# Frontend artifacts
+# =============================================================================
+# Frontend — Node.js / Next.js
+# =============================================================================
 frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/tsconfig.tsbuildinfo
-tools/
+frontend/.vercel/
 
-# Generated datasets
+# =============================================================================
+# Frontend — build & cache
+# =============================================================================
+*.tsbuildinfo
+.npm/
+.yarn/
+.pnp.*
+
+# =============================================================================
+# IDE & editor
+# =============================================================================
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =============================================================================
+# Docker
+# =============================================================================
+docker-compose.override.yml
+
+# =============================================================================
+# Generated data & uploads
+# =============================================================================
+backend/data/
 data/csv/*.csv
+!data/csv/.gitkeep
+!data/csv/derived_weather/.gitkeep
+!data/csv/test_weather/.gitkeep
+!data/csv/test_household/.gitkeep
+!data/csv/test_market/.gitkeep
+!data/csv/time_series/.gitkeep
+*.csv
+!sample_nasa_weather.csv
+!sample_weather_test.csv
 
-__pycache__/
-.pytest_cache/
-.venv/
-docs/
+# =============================================================================
+# Monitoring data (runtime)
+# =============================================================================
+monitoring/prometheus/data/
+monitoring/grafana/data/
+
+# =============================================================================
+# MLflow & Ray (runtime)
+# =============================================================================
+mlruns/
+mlartifacts/
+ray_home/
+/tmp/ray/
+
+# =============================================================================
+# Coverage & test reports
+# =============================================================================
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+nosetests.xml
+test-results/
+junit.xml
+
+# =============================================================================
+# Project internals
+# =============================================================================
+tools/
 tasks/
 
-backend/data/
-backend/artifacts/
-*.csv
+# =============================================================================
+# OS files
+# =============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db

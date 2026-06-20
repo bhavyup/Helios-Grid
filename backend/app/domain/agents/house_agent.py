@@ -3,12 +3,11 @@ HouseAgent -- Rule-based household decision agent.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
 from app.core.project_config import config
-from app.infrastructure.logging_utils import log_simulation_data
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +22,8 @@ class HouseAgent:
         max_consumption: float = 5.0,
         price_ceiling: float = 10.0,
         log_dir: str = config.LOG_DIR,
-        comm_layer: Optional[Any] = None,
-        seed: Optional[int] = None,
+        comm_layer: Any | None = None,
+        seed: int | None = None,
     ):
         self.house_id = house_id
         self.initial_energy = initial_energy
@@ -34,8 +33,8 @@ class HouseAgent:
         self.log_dir = log_dir
         self.running: bool = False
 
-        self.consumption_history: List[Tuple[int, float]] = []
-        self.price_history: List[Tuple[int, float]] = []
+        self.consumption_history: list[tuple[int, float]] = []
+        self.price_history: list[tuple[int, float]] = []
 
         self.rng = np.random.RandomState(seed)
         self._comm_layer = comm_layer
@@ -51,9 +50,7 @@ class HouseAgent:
 
         return consumption
 
-    def make_decision(
-        self, price: float, time_step: int
-    ) -> Dict[str, Any]:
+    def make_decision(self, price: float, time_step: int) -> dict[str, Any]:
         consumption = self.update_consumption(price, time_step)
         return {
             "house_id": self.house_id,
@@ -63,7 +60,7 @@ class HouseAgent:
             "energy": self.energy,
         }
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         return {
             "house_id": self.house_id,
             "current_energy": self.energy,
@@ -71,7 +68,7 @@ class HouseAgent:
             "price_history": list(self.price_history),
         }
 
-    def get_consumption_history(self) -> List[Tuple[int, float]]:
+    def get_consumption_history(self) -> list[tuple[int, float]]:
         return list(self.consumption_history)
 
     def reset(self) -> None:
@@ -79,7 +76,7 @@ class HouseAgent:
         self.consumption_history.clear()
         self.price_history.clear()
 
-    def communicate(self, message: Dict[str, Any]) -> None:
+    def communicate(self, message: dict[str, Any]) -> None:
         if message.get("component_type") != "grid":
             return
 
@@ -97,14 +94,16 @@ class HouseAgent:
         decision = self.make_decision(float(price), int(time_step))
 
         if self._comm_layer is not None:
-            self._comm_layer.send_message({
-                "component_type": "agent",
-                "agent_id": self.house_id,
-                "time_step": time_step,
-                "price": decision["price"],
-                "consumption": decision["consumption"],
-                "energy": decision["energy"],
-            })
+            self._comm_layer.send_message(
+                {
+                    "component_type": "agent",
+                    "agent_id": self.house_id,
+                    "time_step": time_step,
+                    "price": decision["price"],
+                    "consumption": decision["consumption"],
+                    "energy": decision["energy"],
+                }
+            )
 
     def run(self, num_steps: int = 100) -> None:
         self.running = True
@@ -123,14 +122,16 @@ class HouseAgent:
                 decision = self.make_decision(price, step)
 
                 if self._comm_layer is not None:
-                    self._comm_layer.send_message({
-                        "component_type": "agent",
-                        "agent_id": self.house_id,
-                        "time_step": step,
-                        "price": decision["price"],
-                        "consumption": decision["consumption"],
-                        "energy": decision["energy"],
-                    })
+                    self._comm_layer.send_message(
+                        {
+                            "component_type": "agent",
+                            "agent_id": self.house_id,
+                            "time_step": step,
+                            "price": decision["price"],
+                            "consumption": decision["consumption"],
+                            "energy": decision["energy"],
+                        }
+                    )
 
                 logger.info(
                     "House %d -- Step %d/%d -- "

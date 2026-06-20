@@ -10,7 +10,6 @@ from app.infrastructure.database import get_db
 from app.repositories.db_models import User
 from app.services.auth_service import get_user_by_id
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
@@ -64,7 +63,9 @@ def get_current_user(
     return get_current_user_from_token(db, token)
 
 
-def require_active_user(current_user: User | None = Depends(get_current_user)) -> User | None:
+def require_active_user(
+    current_user: User | None = Depends(get_current_user),
+) -> User | None:
     if not settings.auth_enabled:
         return None
     if current_user is None:
@@ -76,7 +77,9 @@ def require_active_user(current_user: User | None = Depends(get_current_user)) -
 
 
 def require_roles(*roles: str):
-    def _dependency(current_user: User | None = Depends(require_active_user)) -> User | None:
+    def _dependency(
+        current_user: User | None = Depends(require_active_user),
+    ) -> User | None:
         if not settings.auth_enabled:
             return None
         if current_user is None:

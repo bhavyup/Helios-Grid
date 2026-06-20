@@ -1,4 +1,4 @@
-temperature,solar_irradiance
-20.0,0.40
-21.2,0.52
-22.5,0.63
+utc_timestamp,temperature,solar_irradiance
+2026-01-01T12:00:00Z,20.0,0.40
+2026-01-01T12:15:00Z,21.2,0.52
+2026-01-01T12:30:00Z,22.5,0.63

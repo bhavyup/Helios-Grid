@@ -2,12 +2,12 @@
 CommunicationLayer -- TCP socket-based message router.
 """
 
+import logging
+import queue
 import socket
 import threading
-import queue
-import logging
-from typing import Dict, Any
 from datetime import datetime
+from typing import Any
 
 from app.core.project_config import config
 from app.domain.models.gnn_coordinator import GNNCoordinator
@@ -43,7 +43,7 @@ class CommunicationLayer:
 
         self.clients: list[socket.socket] = []
         self._clients_lock = threading.Lock()
-        self.message_queue: queue.Queue[Dict[str, Any]] = queue.Queue()
+        self.message_queue: queue.Queue[dict[str, Any]] = queue.Queue()
         self.running: bool = False
 
         self._gnn_coordinator = gnn_coordinator
@@ -53,9 +53,7 @@ class CommunicationLayer:
 
     def start(self) -> None:
         if self.running:
-            logger.warning(
-                "CommunicationLayer.start() called while already running"
-            )
+            logger.warning("CommunicationLayer.start() called while already running")
             return
 
         self.running = True
@@ -72,9 +70,7 @@ class CommunicationLayer:
         )
         self._listener_thread.start()
         self._processor_thread.start()
-        logger.info(
-            "CommunicationLayer started on %s:%d", self.host, self.port
-        )
+        logger.info("CommunicationLayer started on %s:%d", self.host, self.port)
 
     def stop(self) -> None:
         self.running = False
@@ -106,7 +102,7 @@ class CommunicationLayer:
                 logger.info("Connection from %s", addr)
                 with self._clients_lock:
                     self.clients.append(client)
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except OSError:
                 if not self.running:
@@ -117,9 +113,7 @@ class CommunicationLayer:
     def _process_messages(self) -> None:
         while self.running:
             try:
-                message = self.message_queue.get(
-                    timeout=self._QUEUE_TIMEOUT_S
-                )
+                message = self.message_queue.get(timeout=self._QUEUE_TIMEOUT_S)
             except queue.Empty:
                 continue
 
@@ -130,7 +124,7 @@ class CommunicationLayer:
             finally:
                 self.message_queue.task_done()
 
-    def _route_message(self, message: Dict[str, Any]) -> None:
+    def _route_message(self, message: dict[str, Any]) -> None:
         component_type = message.get("component_type")
         if component_type == "gnn":
             self._send_to_gnn(message)
@@ -141,7 +135,7 @@ class CommunicationLayer:
         else:
             logger.warning("Unknown component_type: %r", component_type)
 
-    def _send_to_gnn(self, message: Dict[str, Any]) -> None:
+    def _send_to_gnn(self, message: dict[str, Any]) -> None:
         if self._gnn_coordinator is None:
             default_graph = create_grid_graph(
                 num_households=int(config.get("num_households", 10)),
@@ -153,9 +147,7 @@ class CommunicationLayer:
                 log_dir=config.LOG_DIR,
             )
 
-        self._gnn_coordinator.run(
-            num_epochs=message.get("epochs", 100)
-        )
+        self._gnn_coordinator.run(num_epochs=message.get("epochs", 100))
 
         log_training_data(
             log_dir=config.LOG_DIR,
@@ -167,21 +159,21 @@ class CommunicationLayer:
             step=message.get("step", 1),
         )
 
-    def _send_to_agent(self, message: Dict[str, Any]) -> None:
+    def _send_to_agent(self, message: dict[str, Any]) -> None:
         agent_id = message.get("agent_id")
         reward = message.get("reward", 0.0)
         action = message.get("action", "none")
         logger.info(
             "Agent %s received reward: %s, action: %s",
-            agent_id, reward, action,
+            agent_id,
+            reward,
+            action,
         )
 
-    def _send_to_grid(self, message: Dict[str, Any]) -> None:
+    def _send_to_grid(self, message: dict[str, Any]) -> None:
         log_simulation_data(
             log_dir=config.LOG_DIR,
-            timestamp=message.get(
-                "timestamp", datetime.now().isoformat()
-            ),
+            timestamp=message.get("timestamp", datetime.now().isoformat()),
             grid_balance=message.get("grid_balance", 0.0),
             market_balance=message.get("market_balance", 0.0),
             household_consumption=message.get("household_consumption", 0.0),
@@ -189,5 +181,5 @@ class CommunicationLayer:
             wind_production=message.get("wind_production", 0.0),
         )
 
-    def send_message(self, message: Dict[str, Any]) -> None:
+    def send_message(self, message: dict[str, Any]) -> None:
         self.message_queue.put(message)

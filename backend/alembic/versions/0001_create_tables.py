@@ -1,5 +1,6 @@
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "0001_create_tables"
 down_revision = None
@@ -45,7 +46,10 @@ def upgrade() -> None:
         "episodes",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column(
-            "simulation_id", sa.Integer(), sa.ForeignKey("simulations.id"), nullable=False
+            "simulation_id",
+            sa.Integer(),
+            sa.ForeignKey("simulations.id"),
+            nullable=False,
         ),
         sa.Column("episode_index", sa.Integer(), nullable=False),
         sa.Column("started_at", sa.DateTime(timezone=True)),
@@ -60,7 +64,10 @@ def upgrade() -> None:
         "households",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column(
-            "simulation_id", sa.Integer(), sa.ForeignKey("simulations.id"), nullable=False
+            "simulation_id",
+            sa.Integer(),
+            sa.ForeignKey("simulations.id"),
+            nullable=False,
         ),
         sa.Column("household_index", sa.Integer(), nullable=False),
         sa.Column("initial_energy", sa.Float()),
@@ -86,7 +93,10 @@ def upgrade() -> None:
         "models",
         sa.Column("id", sa.Integer(), primary_key=True),
         sa.Column(
-            "training_run_id", sa.Integer(), sa.ForeignKey("training_runs.id"), nullable=False
+            "training_run_id",
+            sa.Integer(),
+            sa.ForeignKey("training_runs.id"),
+            nullable=False,
         ),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("artifact_path", sa.Text()),

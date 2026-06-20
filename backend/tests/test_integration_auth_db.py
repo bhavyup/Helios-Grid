@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from app.repositories.db_models import Episode, Metric, ModelArtifact, Simulation, TrainingRun, User
+from app.repositories.db_models import (
+    Episode,
+    Metric,
+    ModelArtifact,
+    Simulation,
+    TrainingRun,
+    User,
+)
 from app.services.auth_service import create_user, issue_token_pair
 
 
@@ -14,13 +21,17 @@ def test_auth_api_roundtrip_and_refresh_rotation(client, db_session):
     email = _unique_email("auth")
     password = "test-pass-123"
 
-    register = client.post("/auth/register", json={"email": email, "password": password})
+    register = client.post(
+        "/auth/register", json={"email": email, "password": password}
+    )
     assert register.status_code in (200, 409)
 
     if register.status_code == 200:
         register_payload = register.json()
     else:
-        login_response = client.post("/auth/login", json={"email": email, "password": password})
+        login_response = client.post(
+            "/auth/login", json={"email": email, "password": password}
+        )
         assert login_response.status_code == 200
         register_payload = login_response.json()
 
@@ -55,13 +66,17 @@ def test_auth_api_roundtrip_and_refresh_rotation(client, db_session):
 
 def test_admin_can_list_users_and_persist_domain_models(client, db_session):
     admin_email = _unique_email("admin")
-    admin = create_user(db_session, email=admin_email, password="admin-pass-123", role="admin")
+    admin = create_user(
+        db_session, email=admin_email, password="admin-pass-123", role="admin"
+    )
     issue_token_pair(db_session, admin)
 
     other_email = _unique_email("member")
-    other = create_user(db_session, email=other_email, password="member-pass-123")
+    create_user(db_session, email=other_email, password="member-pass-123")
 
-    users_response = client.post("/auth/login", json={"email": admin_email, "password": "admin-pass-123"})
+    users_response = client.post(
+        "/auth/login", json={"email": admin_email, "password": "admin-pass-123"}
+    )
     assert users_response.status_code == 200
     admin_access = users_response.json()["access_token"]
     list_response = client.get(
@@ -89,7 +104,9 @@ def test_admin_can_list_users_and_persist_domain_models(client, db_session):
     db_session.add_all([simulation, training_run])
     db_session.flush()
 
-    episode = Episode(simulation_id=simulation.id, episode_index=0, step_count=4, total_reward=3.5)
+    episode = Episode(
+        simulation_id=simulation.id, episode_index=0, step_count=4, total_reward=3.5
+    )
     db_session.add(episode)
     db_session.flush()
     metric = Metric(

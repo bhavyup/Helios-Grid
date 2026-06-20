@@ -23,6 +23,7 @@ tuning parameters that should be adjusted during calibration.
 """
 
 import logging
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ logger = logging.getLogger(__name__)
 # ===================================================================
 # Household-level reward
 # ===================================================================
+
 
 def compute_house_reward(
     consumption: float,
@@ -77,6 +79,7 @@ def compute_house_reward(
 # Market-level reward
 # ===================================================================
 
+
 def compute_market_reward(
     supply: float,
     demand: float,
@@ -99,7 +102,9 @@ def compute_market_reward(
         logger.warning(
             "compute_market_reward received negative values: "
             "supply=%.2f, demand=%.2f, price=%.2f",
-            supply, demand, price,
+            supply,
+            demand,
+            price,
         )
 
     max_flow = max(supply, demand)
@@ -120,6 +125,7 @@ def compute_market_reward(
 # Grid-level reward (placeholder)
 # ===================================================================
 
+
 def compute_grid_reward(
     supply: float,
     demand: float,
@@ -136,6 +142,7 @@ def compute_grid_reward(
 # ===================================================================
 # Total reward aggregation
 # ===================================================================
+
 
 def compute_total_reward(
     house_reward: float,
@@ -166,6 +173,7 @@ def compute_total_reward(
 # ===================================================================
 # Utility validation (optional for callers)
 # ===================================================================
+
 
 def validate_reward(reward: float, name: str = "reward") -> bool:
     """

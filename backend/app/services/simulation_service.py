@@ -1,16 +1,17 @@
 """Simulation session service for deterministic, API-driven grid runs."""
 
 from __future__ import annotations
-from pydantic import BaseModel, Field
+
 from collections import deque
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
+from pydantic import Field
 
 from app.core.project_config import config
 from app.infrastructure.monitoring import record_simulation_state
@@ -37,7 +38,7 @@ class SimulationService:
 
     def __init__(self, history_limit: int = 5_000) -> None:
         self._lock = RLock()
-        self._history: Deque[StepRecord] = deque(maxlen=history_limit)
+        self._history: deque[StepRecord] = deque(maxlen=history_limit)
 
         self._env: Any = None
         self._episode_id = 0
@@ -47,8 +48,8 @@ class SimulationService:
         self._active_household_data_path: str | None = None
         self._active_market_data_path: str | None = None
 
-        self._latest_observation: Dict[str, Any] | None = None
-        self._latest_info: Dict[str, Any] = {}
+        self._latest_observation: dict[str, Any] | None = None
+        self._latest_info: dict[str, Any] = {}
         # PV defaults used for simple pv_power estimation when explicit column is absent
         self._default_panel_area = float(config.get("pv", {}).get("panel_area", 1.0))
         self._default_panel_efficiency = float(
@@ -71,7 +72,7 @@ class SimulationService:
         weather_data_path: str | None = None,
         household_data_path: str | None = None,
         market_data_path: str | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Start a fresh simulation episode and return the initial state."""
         with self._lock:
             effective_seed = self._seed if seed is None else int(seed)
@@ -121,10 +122,10 @@ class SimulationService:
 
     def step(
         self,
-        house_actions: List[List[float]] | None = None,
+        house_actions: list[list[float]] | None = None,
         market_action: int | None = None,
         use_autopilot: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Advance one timestep and return state, diagnostics, and metrics."""
         with self._lock:
             self._ensure_env()
@@ -163,12 +164,12 @@ class SimulationService:
         steps: int,
         use_autopilot: bool = True,
         market_action: int | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run multiple steps and return trajectory plus latest state snapshot."""
         if steps <= 0:
             raise ValueError("steps must be greater than zero")
 
-        trajectory: List[Dict[str, Any]] = []
+        trajectory: list[dict[str, Any]] = []
         for _ in range(steps):
             step_payload = self.step(
                 house_actions=None,
@@ -185,13 +186,13 @@ class SimulationService:
             "metrics": self.get_metrics(),
         }
 
-    def get_state(self, include_topology: bool = True) -> Dict[str, Any]:
+    def get_state(self, include_topology: bool = True) -> dict[str, Any]:
         """Return the latest state; lazily initializes the session when missing."""
         with self._lock:
             self._ensure_env()
             return self._build_state_payload(include_topology=include_topology)
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Return aggregate metrics for the current episode."""
         with self._lock:
             if not self._history:
@@ -244,13 +245,13 @@ class SimulationService:
                 "average_renewable_utilization": float(renewable.mean()),
             }
 
-    def get_history(self, limit: int = 300) -> List[Dict[str, Any]]:
+    def get_history(self, limit: int = 300) -> list[dict[str, Any]]:
         """Return the latest trajectory points for chart rendering."""
         with self._lock:
             capped = max(1, min(int(limit), len(self._history)))
             return [asdict(record) for record in list(self._history)[-capped:]]
 
-    def get_csv_schemas(self) -> Dict[str, Any]:
+    def get_csv_schemas(self) -> dict[str, Any]:
         """Return expected CSV role schemas and current runtime support status."""
         return {
             "weather": {
@@ -269,7 +270,10 @@ class SimulationService:
                     "humidity",
                 ],
                 "runtime_supported_now": True,
-                "runtime_usage": "Pass weather_data_path, household_data_path, and market_data_path when resetting simulation.",
+                "runtime_usage": (
+                    "Pass weather_data_path, household_data_path, "
+                    "and market_data_path when resetting simulation."
+                ),
             },
             "household": {
                 "description": "Household demand series consumed by load_household_data.",
@@ -277,7 +281,11 @@ class SimulationService:
                 "required_any": [],
                 "recommended": ["consumption"],
                 "runtime_supported_now": True,
-                "runtime_usage": "Pass household_data_path, weather_data_path, and market_data_path when resetting simulation to enable household data integration in GridEnv.",
+                "runtime_usage": (
+                    "Pass household_data_path, weather_data_path, "
+                    "and market_data_path when resetting simulation to enable "
+                    "household data integration in GridEnv."
+                ),
             },
             "market": {
                 "description": "Market time-series consumed by load_market_data / MarketEnv.",
@@ -285,7 +293,11 @@ class SimulationService:
                 "required_any": [],
                 "recommended": ["supply", "demand", "price"],
                 "runtime_supported_now": True,
-                "runtime_usage": "Pass market_data_path, weather_data_path, and household_data_path when resetting simulation to enable market data integration in GridEnv.",
+                "runtime_usage": (
+                    "Pass market_data_path, weather_data_path, "
+                    "and household_data_path when resetting simulation to enable "
+                    "market data integration in GridEnv."
+                ),
             },
         }
 
@@ -294,7 +306,7 @@ class SimulationService:
         file_path: str,
         role: str = "auto",
         preview_rows: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Inspect a CSV file and report role compatibility and runtime usage guidance."""
         requested_role = role.strip().lower()
         allowed_roles = {"auto", "weather", "household", "market"}
@@ -361,7 +373,7 @@ class SimulationService:
         normalized_columns = {column.strip().lower() for column in columns}
         schemas = self.get_csv_schemas()
 
-        compatibility: Dict[str, Any] = {}
+        compatibility: dict[str, Any] = {}
         for role_name, schema in schemas.items():
             required_all = set(schema.get("required_all", []))
             required_any = set(schema.get("required_any", []))
@@ -417,7 +429,7 @@ class SimulationService:
         role_diagnostics: dict[str, Any] = {}
 
         # household diagnostics (best-effort)
-        cols_lower = [str(c).lower() for c in analysis_frame.columns]
+        [str(c).lower() for c in analysis_frame.columns]
         household_id_col = next(
             (
                 c
@@ -524,7 +536,7 @@ class SimulationService:
         )
 
         # Unit heuristics: warn when columns look like generation vs irradiance
-        unit_warnings: List[Dict[str, Any]] = []
+        unit_warnings: list[dict[str, Any]] = []
         numeric_preview = frame.select_dtypes(include=[np.number])
         for col in numeric_preview.columns:
             col_lower = str(col).lower()
@@ -584,8 +596,7 @@ class SimulationService:
             "selected_role": selected_role,
             "compatibility": compatibility,
             "can_use_now": bool(
-                selected_role == "weather"
-                and selected_compatibility.get("compatible", False)
+                selected_compatibility.get("compatible", False)
                 and selected_compatibility.get("runtime_supported_now", False)
             ),
             "usage_recommendation": recommendation,
@@ -614,7 +625,7 @@ class SimulationService:
         panel_area: float | None = None,
         panel_efficiency: float | None = None,
         temp_coefficient: float | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a GridEnv-compatible weather CSV from a wide source timeseries file.
 
         Backward compatible notes:
@@ -931,7 +942,7 @@ class SimulationService:
         net_load_column: str | None = None,
         output_path: str | None = None,
         normalize_signals: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         source_path = self._resolve_file_path(file_path)
         if not source_path.exists():
             raise FileNotFoundError(f"CSV file not found: {source_path}")
@@ -1027,7 +1038,7 @@ class SimulationService:
         clearing_price_column: str | None = None,
         output_path: str | None = None,
         normalize_signals: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         source_path = self._resolve_file_path(file_path)
         if not source_path.exists():
             raise FileNotFoundError(f"CSV file not found: {source_path}")
@@ -1131,7 +1142,7 @@ class SimulationService:
 
     def store_uploaded_household_csv(
         self, file_name: str, file_bytes: bytes
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not file_name.lower().endswith(".csv"):
             raise ValueError("Only CSV files are supported")
 
@@ -1147,7 +1158,7 @@ class SimulationService:
             or "uploaded_household"
         )
 
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
         resolved_path = (upload_dir / f"{timestamp}_{safe_stem}.csv").resolve()
         resolved_path.write_bytes(file_bytes)
 
@@ -1167,7 +1178,7 @@ class SimulationService:
 
     def store_uploaded_market_csv(
         self, file_name: str, file_bytes: bytes
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if not file_name.lower().endswith(".csv"):
             raise ValueError("Only CSV files are supported")
 
@@ -1183,7 +1194,7 @@ class SimulationService:
             or "uploaded_market"
         )
 
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
         resolved_path = (upload_dir / f"{timestamp}_{safe_stem}.csv").resolve()
         resolved_path.write_bytes(file_bytes)
 
@@ -1203,7 +1214,7 @@ class SimulationService:
 
     def store_uploaded_weather_csv(
         self, file_name: str, file_bytes: bytes
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Persist an uploaded CSV inside the backend workspace for later reset calls."""
         if not file_name.lower().endswith(".csv"):
             raise ValueError("Only CSV files are supported")
@@ -1219,7 +1230,7 @@ class SimulationService:
         if not safe_stem:
             safe_stem = "uploaded_weather"
 
-        timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
         resolved_path = (upload_dir / f"{timestamp}_{safe_stem}.csv").resolve()
         resolved_path.write_bytes(file_bytes)
 
@@ -1238,7 +1249,7 @@ class SimulationService:
         }
 
     @staticmethod
-    def list_available_csv_paths() -> Dict[str, Any]:
+    def list_available_csv_paths() -> dict[str, Any]:
         """Return backend CSV files that can be used or re-used by the dashboard."""
         backend_root = Path(__file__).resolve().parents[2]
         candidate_dirs = [
@@ -1251,7 +1262,7 @@ class SimulationService:
         ]
 
         seen_paths: set[str] = set()
-        items: list[Dict[str, Any]] = []
+        items: list[dict[str, Any]] = []
 
         for directory in candidate_dirs:
             if not directory.exists() or not directory.is_dir():
@@ -1325,11 +1336,11 @@ class SimulationService:
 
     def _build_action_payload(
         self,
-        observation: Dict[str, Any],
-        house_actions: List[List[float]] | None,
+        observation: dict[str, Any],
+        house_actions: list[list[float]] | None,
         market_action: int | None,
         use_autopilot: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         assert self._env is not None
 
         if house_actions is None:
@@ -1358,7 +1369,7 @@ class SimulationService:
             "market_actions": resolved_market_action,
         }
 
-    def _build_autopilot_actions(self, observation: Dict[str, Any]) -> np.ndarray:
+    def _build_autopilot_actions(self, observation: dict[str, Any]) -> np.ndarray:
         assert self._env is not None
 
         house_states = np.asarray(observation["house_states"], dtype=np.float32)
@@ -1403,11 +1414,11 @@ class SimulationService:
 
         return actions
 
-    def _build_state_payload(self, include_topology: bool) -> Dict[str, Any]:
+    def _build_state_payload(self, include_topology: bool) -> dict[str, Any]:
         assert self._env is not None
         assert self._latest_observation is not None
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "episode_id": self._episode_id,
             "seed": self._seed,
             "step": self._step_count,
@@ -1433,7 +1444,7 @@ class SimulationService:
 
         return payload
 
-    def _build_topology_payload(self) -> Dict[str, Any]:
+    def _build_topology_payload(self) -> dict[str, Any]:
         assert self._env is not None
 
         nodes = []
@@ -1472,10 +1483,10 @@ class SimulationService:
 
     def _build_step_record(
         self,
-        observation: Dict[str, Any],
+        observation: dict[str, Any],
         reward: float,
         done: bool,
-        info: Dict[str, Any],
+        info: dict[str, Any],
     ) -> StepRecord:
         house_states = np.asarray(observation["house_states"], dtype=np.float32)
         market_snapshot = (
@@ -1499,7 +1510,7 @@ class SimulationService:
 
         return StepRecord(
             step=self._step_count,
-            timestamp=datetime.now(tz=timezone.utc).isoformat(),
+            timestamp=datetime.now(tz=UTC).isoformat(),
             reward=float(reward),
             done=bool(done),
             supply=supply,
@@ -1509,11 +1520,11 @@ class SimulationService:
             renewable_utilization=renewable_utilization,
         )
 
-    def _build_trajectory_point(self) -> Dict[str, Any]:
+    def _build_trajectory_point(self) -> dict[str, Any]:
         if not self._history:
             return {
                 "step": self._step_count,
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "timestamp": datetime.now(tz=UTC).isoformat(),
                 "reward": 0.0,
                 "done": False,
                 "supply": 0.0,
@@ -1746,7 +1757,7 @@ class SimulationService:
     @staticmethod
     def _build_csv_usage_recommendation(
         selected_role: str,
-        compatibility: Dict[str, Any],
+        compatibility: dict[str, Any],
     ) -> str:
         if selected_role == "weather":
             if compatibility.get("compatible", False):
@@ -1762,16 +1773,16 @@ class SimulationService:
         if selected_role == "household":
             if compatibility.get("compatible", False):
                 return (
-                    "Schema matches household loader expectations. It can be consumed by "
-                    "load_household_data and is ready for upcoming GridEnv household-data wiring."
+                    "This CSV is compatible with household ingestion and can be used immediately "
+                    "by passing household_data_path when resetting the simulation."
                 )
             return "Add a consumption column to make this household-compatible."
 
         if selected_role == "market":
             if compatibility.get("compatible", False):
                 return (
-                    "Schema matches market loader expectations. It can be consumed by load_market_data "
-                    "and is ready for upcoming GridEnv market-data wiring."
+                    "This CSV is compatible with market ingestion and can be used immediately "
+                    "by passing market_data_path when resetting the simulation."
                 )
             return (
                 "Add supply, demand, and price columns to make this market-compatible."
@@ -1783,7 +1794,7 @@ class SimulationService:
         )
 
     @staticmethod
-    def _resolve_data_paths() -> Dict[str, str]:
+    def _resolve_data_paths() -> dict[str, str]:
         defaults = {
             "grid_topology": "data/grid_topology/sample_grid.json",
             "weather_data": "data/weather_data/sample_weather.csv",
