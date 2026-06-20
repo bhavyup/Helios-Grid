@@ -47,11 +47,11 @@ def _install_ray_stub() -> None:
     def wait(values, timeout=None):
         return (list(values), [])
 
-    ray_stub.remote = remote
-    ray_stub.is_initialized = is_initialized
-    ray_stub.init = init
-    ray_stub.get = get
-    ray_stub.wait = wait
+    ray_stub.remote = remote  # type: ignore
+    ray_stub.is_initialized = is_initialized  # type: ignore
+    ray_stub.init = init  # type: ignore
+    ray_stub.get = get  # type: ignore
+    ray_stub.wait = wait  # type: ignore
     sys.modules["ray"] = ray_stub
 
 
