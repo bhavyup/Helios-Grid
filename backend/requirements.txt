@@ -27,6 +27,7 @@ slowapi>=0.1.5
 limits>=2.8.0
 gevent>=24.2.1
 locust>=2.24.0
+httpx>=0.25.0
 requests>=2.31.0
 prometheus-client>=0.20.0
 psutil>=6.0.0
