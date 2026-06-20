@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
@@ -32,7 +32,7 @@ class ResetRequest(BaseModel):
 class StepRequest(BaseModel):
     """Request body for a single simulation step."""
 
-    house_actions: List[List[float]] | None = None
+    house_actions: list[list[float]] | None = None
     market_action: int | None = Field(default=None, ge=0, le=1)
     use_autopilot: bool = True
 
@@ -127,7 +127,7 @@ class CsvPathsResponse(BaseModel):
     count: int
 
 
-@limiter.limit(settings.rate_limit_simulation)
+@limiter.limit(settings.effective_rate_limit_simulation)
 @router.post("/reset")
 def reset_simulation(request: Request, payload: ResetRequest) -> dict[str, Any]:
     """Reset the in-memory episode and return initial state."""
@@ -146,7 +146,7 @@ def reset_simulation(request: Request, payload: ResetRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(error)) from error
 
 
-@limiter.limit(settings.rate_limit_simulation)
+@limiter.limit(settings.effective_rate_limit_simulation)
 @router.post("/step")
 def step_simulation(request: Request, payload: StepRequest) -> dict[str, Any]:
     """Advance one timestep and return updated state and diagnostics."""
@@ -157,7 +157,7 @@ def step_simulation(request: Request, payload: StepRequest) -> dict[str, Any]:
     )
 
 
-@limiter.limit(settings.rate_limit_simulation)
+@limiter.limit(settings.effective_rate_limit_simulation)
 @router.post("/run")
 def run_simulation(request: Request, payload: RunRequest) -> dict[str, Any]:
     """Execute multiple steps and return trajectory with summary metrics."""

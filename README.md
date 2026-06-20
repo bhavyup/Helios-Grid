@@ -56,6 +56,66 @@
 
 ---
 
+## 👥 The Team
+
+> The people behind the grid. Builders, thinkers, and makers who believe the future of energy is decentralized, intelligent, and open-source.
+
+<table>
+  <tr>
+    <td align="center" width="260">
+      <a href="https://github.com/bhavyup">
+        <img src="https://avatars.githubusercontent.com/u/113595012?v=4" width="110" height="110" style="border-radius:50%; border:2px solid #d4af37;" alt="Bhavy Upreti" />
+      </a>
+      <br />
+      <strong style="font-size:15px; color:#d4af37;">Bhavy Upreti</strong>
+      <br />
+      <em style="font-size:12px; color:#a8b0bc;">Core Contributor · Full-Stack Architect · System Developer</em>
+      <br />
+      <sub style="font-size:11px; color:#7fb6a8;">
+        Simulation engine · PPO training pipeline<br/>
+        Dashboard design · Cloud infrastructure · DevOps Integration
+      </sub>
+      <br /><br />
+      <a href="https://github.com/bhavyup">
+        <img src="https://img.shields.io/badge/GitHub-bhavyup-0b0d12?style=for-the-badge&logo=github&logoColor=d4af37&labelColor=0b0d12" alt="GitHub" />
+      </a>
+    </td>
+    <td align="center" width="260">
+      <a href="https://github.com/Ayushman-Singh08">
+        <img src="https://avatars.githubusercontent.com/u/153157882?v=4" width="110" height="110" style="border-radius:50%; border:2px solid #7fb6a8;" alt="Ayushman Singh" />
+      </a>
+      <br />
+      <strong style="font-size:15px; color:#7fb6a8;">Ayushman Singh</strong>
+      <br />
+      <em style="font-size:12px; color:#a8b0bc;">Project Lead · ML Engineer · Data Analyst & Backend Engineer</em>
+      <br />
+      <sub style="font-size:11px; color:#7fb6a8;">
+        Reinforcement learning models<br/>
+        Simulation controls · Dev workflow · Monitoring Analytics · Data Pipelines
+      </sub>
+      <br /><br />
+      <a href="https://github.com/Ayushman-Singh08">
+        <img src="https://img.shields.io/badge/GitHub-Ayushman--Singh08-0b0d12?style=for-the-badge&logo=github&logoColor=7fb6a8&labelColor=0b0d12" alt="GitHub" />
+      </a>
+    </td>
+  </tr>
+</table>
+
+### Contribution Highlights
+
+| Member | Key Contributions |
+|--------|-------------------|
+| **Bhavy Upreti** | GridEnv orchestrator, MarketEngine (CDA), RewardEngine, PPO agent implementation, GNN coordinator, FastAPI backend architecture, Next.js Mission Control dashboard, Docker stack, CI/CD pipeline |
+| **Ayushman Singh** | Simulation controls & settings, PPO training workflow, HouseEnv dynamics, reinforcement learning model integration, development workflow tooling, weather data pipeline, monitoring stack |
+
+---
+
+<p align="center">
+  <em>Want to join the grid? Check out our <a href="CONTRIBUTING.md">Contributing Guide</a> — we'd love to have you.</em>
+</p>
+
+---
+
 ## 🌐 Table of Contents
 
 - [What is Helios-Grid?](#-what-is-helios-grid)
@@ -1140,66 +1200,6 @@ Contributions are welcome! Whether you're fixing a bug, adding a feature, improv
 ## 📄 License
 
 This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details. By contributing, you agree that your contributions will also be licensed under GPLv3.
-
----
-
-## 👥 The Team
-
-> The people behind the grid. Builders, thinkers, and makers who believe the future of energy is decentralized, intelligent, and open-source.
-
-<table>
-  <tr>
-    <td align="center" width="260">
-      <a href="https://github.com/bhavyup">
-        <img src="https://avatars.githubusercontent.com/u/113595012?v=4" width="110" height="110" style="border-radius:50%; border:2px solid #d4af37;" alt="Bhavy Upreti" />
-      </a>
-      <br />
-      <strong style="font-size:15px; color:#d4af37;">Bhavy Upreti</strong>
-      <br />
-      <em style="font-size:12px; color:#a8b0bc;">Core Contributor · Full-Stack Architect · System Developer</em>
-      <br />
-      <sub style="font-size:11px; color:#7fb6a8;">
-        Simulation engine · PPO training pipeline<br/>
-        Dashboard design · Cloud infrastructure · DevOps Integration
-      </sub>
-      <br /><br />
-      <a href="https://github.com/bhavyup">
-        <img src="https://img.shields.io/badge/GitHub-bhavyup-0b0d12?style=for-the-badge&logo=github&logoColor=d4af37&labelColor=0b0d12" alt="GitHub" />
-      </a>
-    </td>
-    <td align="center" width="260">
-      <a href="https://github.com/Ayushman-Singh08">
-        <img src="https://avatars.githubusercontent.com/u/153157882?v=4" width="110" height="110" style="border-radius:50%; border:2px solid #7fb6a8;" alt="Ayushman Singh" />
-      </a>
-      <br />
-      <strong style="font-size:15px; color:#7fb6a8;">Ayushman Singh</strong>
-      <br />
-      <em style="font-size:12px; color:#a8b0bc;">Project Lead · ML Engineer · Data Analyst & Engineer</em>
-      <br />
-      <sub style="font-size:11px; color:#7fb6a8;">
-        Reinforcement learning models<br/>
-        Simulation controls · Dev workflow · Monitoring Analytics · Data Pipelines
-      </sub>
-      <br /><br />
-      <a href="https://github.com/Ayushman-Singh08">
-        <img src="https://img.shields.io/badge/GitHub-Ayushman--Singh08-0b0d12?style=for-the-badge&logo=github&logoColor=7fb6a8&labelColor=0b0d12" alt="GitHub" />
-      </a>
-    </td>
-  </tr>
-</table>
-
-### Contribution Highlights
-
-| Member | Key Contributions |
-|--------|-------------------|
-| **Bhavy Upreti** | GridEnv orchestrator, MarketEngine (CDA), RewardEngine, PPO agent implementation, GNN coordinator, FastAPI backend architecture, Next.js Mission Control dashboard, Docker stack, CI/CD pipeline |
-| **Ayushman Singh** | Simulation controls & settings, PPO training workflow, HouseEnv dynamics, reinforcement learning model integration, development workflow tooling, weather data pipeline, monitoring stack |
-
----
-
-<p align="center">
-  <em>Want to join the grid? Check out our <a href="CONTRIBUTING.md">Contributing Guide</a> — we'd love to have you.</em>
-</p>
 
 ---
 

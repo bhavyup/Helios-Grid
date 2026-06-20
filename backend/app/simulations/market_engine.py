@@ -1,13 +1,12 @@
 """MarketEngine coordinates the MarketModel and market snapshots."""
 
-from typing import Dict
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
 from app.core.project_config import config
 from app.domain.models.market_model import MarketModel
-from dataclasses import dataclass
-from typing import Any, List, Tuple
 
 
 @dataclass(frozen=True)
@@ -50,7 +49,7 @@ class MarketEngine:
         self.last_orders: list[dict[str, Any]] = []
         self.last_trades: list[dict[str, Any]] = []
 
-    def reset(self) -> Dict[str, float]:
+    def reset(self) -> dict[str, float]:
         self.last_snapshot = self.market_model.reset()
         return dict(self.last_snapshot)
 
@@ -155,9 +154,9 @@ class MarketEngine:
         market_action: int,
         solar: float = 0.0,
         wind: float = 0.0,
-        weather: Dict[str, float] | None = None,
+        weather: dict[str, float] | None = None,
         house_states: list[tuple[int, list[float]]] | None = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         # Allow passing a weather dict to augment market decision inputs.
         if weather is not None:
             # prefer explicit pv_power if present, otherwise fall back to irradiance

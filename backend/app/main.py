@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.extension import _rate_limit_exceeded_handler
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.health import router as health_router
@@ -8,12 +11,11 @@ from app.api.routes.simulation import router as simulation_router
 from app.api.routes.simulation_ws import router as simulation_ws_router
 from app.api.routes.training import router as training_router
 from app.core.settings import settings
+from app.infrastructure.logging_setup import (
+    configure_logging,
+    request_logging_middleware,
+)
 from app.infrastructure.rate_limiter import limiter
-from app.infrastructure.logging_setup import configure_logging, request_logging_middleware
-from slowapi.errors import RateLimitExceeded
-from slowapi.extension import _rate_limit_exceeded_handler
-from slowapi.middleware import SlowAPIMiddleware
-
 
 configure_logging()
 

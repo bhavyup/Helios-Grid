@@ -26,8 +26,8 @@ grid_env.py declares:
 Per-household slice:  action (6,)  →  state (10,)
 """
 
-import sys
 import pathlib
+import sys
 
 import numpy as np
 import pytest
@@ -39,14 +39,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.envs.house_env import HouseEnv
-
+from app.envs.house_env import HouseEnv  # noqa: E402  (sys.path must be set first)
 
 # ===========================================================================
 # Constants derived from grid_env.py's space declarations
 # ===========================================================================
-ACTION_DIM = 6          # Box(low=0, high=1, shape=(N, 6))
-OBS_DIM = 10            # Box(shape=(N, 10), dtype=float32)
+ACTION_DIM = 6  # Box(low=0, high=1, shape=(N, 6))
+OBS_DIM = 10  # Box(shape=(N, 10), dtype=float32)
 ACTION_DTYPE = np.float32
 OBS_DTYPE = np.float32
 
@@ -54,6 +53,7 @@ OBS_DTYPE = np.float32
 # ===========================================================================
 # Helpers
 # ===========================================================================
+
 
 def _make_action(value: float = 0.5) -> np.ndarray:
     """
@@ -86,14 +86,13 @@ def _assert_valid_obs(arr: np.ndarray, context: str = ""):
     assert obs.shape == (OBS_DIM,), (
         f"{context}: expected shape ({OBS_DIM},), got {obs.shape}"
     )
-    assert np.all(np.isfinite(obs)), (
-        f"{context}: non-finite values: {obs}"
-    )
+    assert np.all(np.isfinite(obs)), f"{context}: non-finite values: {obs}"
 
 
 # ===========================================================================
 # Fixtures
 # ===========================================================================
+
 
 @pytest.fixture
 def env():
@@ -115,8 +114,8 @@ def reset_env(env):
 # 1. Import and construction
 # ===========================================================================
 
-class TestConstruction:
 
+class TestConstruction:
     def test_import_resolves(self):
         """
         ``from app.envs.house_env import HouseEnv`` must succeed.
@@ -125,6 +124,7 @@ class TestConstruction:
         module slot.
         """
         from app.envs.house_env import HouseEnv as _H
+
         assert _H is not None
 
     def test_zero_arg_construction(self):
@@ -140,8 +140,8 @@ class TestConstruction:
 # 2. reset() contract
 # ===========================================================================
 
-class TestReset:
 
+class TestReset:
     def test_reset_does_not_crash(self, env):
         """reset() is callable without error."""
         env.reset()
@@ -154,8 +154,7 @@ class TestReset:
         """
         result = env.reset()
         assert result is None or isinstance(result, np.ndarray), (
-            f"reset() returned {type(result).__name__}; "
-            f"expected ndarray or None"
+            f"reset() returned {type(result).__name__}; expected ndarray or None"
         )
 
     def test_reset_observation_shape_if_returned(self, env):
@@ -175,6 +174,7 @@ class TestReset:
 # ===========================================================================
 # 3. get_state() contract
 # ===========================================================================
+
 
 class TestGetState:
     """
@@ -206,7 +206,7 @@ class TestGetState:
 
     def test_valid_after_multiple_steps(self, reset_env):
         rng = np.random.RandomState(7)
-        for i in range(15):
+        for _i in range(15):
             action = rng.uniform(0, 1, size=(ACTION_DIM,)).astype(ACTION_DTYPE)
             reset_env.step(action)
         state = reset_env.get_state()
@@ -216,6 +216,7 @@ class TestGetState:
 # ===========================================================================
 # 4. step() contract
 # ===========================================================================
+
 
 class TestStep:
     """
@@ -237,8 +238,7 @@ class TestStep:
         """Return must be a tuple (gym) or ndarray (bare state)."""
         result = reset_env.step(_make_action())
         assert isinstance(result, (tuple, np.ndarray)), (
-            f"step() returned {type(result).__name__}; "
-            f"expected tuple or ndarray"
+            f"step() returned {type(result).__name__}; expected tuple or ndarray"
         )
 
     def test_observation_shape(self, reset_env):
@@ -277,8 +277,8 @@ class TestStep:
 # 5. Action-space coverage
 # ===========================================================================
 
-class TestActionSpace:
 
+class TestActionSpace:
     @pytest.mark.parametrize("value", [0.0, 0.25, 0.5, 0.75, 1.0])
     def test_boundary_values_accepted(self, reset_env, value):
         """Box(low=0, high=1) boundary and interior values."""
@@ -306,6 +306,7 @@ class TestActionSpace:
 # ===========================================================================
 # 6. Action has causal effect
 # ===========================================================================
+
 
 class TestActionCausality:
     """
@@ -353,8 +354,8 @@ class TestActionCausality:
 # 7. Episode lifecycle
 # ===========================================================================
 
-class TestEpisodeLifecycle:
 
+class TestEpisodeLifecycle:
     def test_reset_produces_valid_state(self, env):
         env.reset()
         _assert_valid_obs(env.get_state(), "post-reset state")
@@ -400,6 +401,7 @@ class TestEpisodeLifecycle:
 # 8. Determinism / reproducibility
 # ===========================================================================
 
+
 class TestDeterminism:
     """
     Core Helios-Grid principle: deterministic behavior under fixed seed.
@@ -434,9 +436,9 @@ class TestDeterminism:
 
         s0 = np.asarray(envs[0].get_state(), dtype=OBS_DTYPE)
         s1 = np.asarray(envs[1].get_state(), dtype=OBS_DTYPE)
-        np.testing.assert_array_equal(s0, s1, err_msg=(
-            "Identical seeds produced different initial states"
-        ))
+        np.testing.assert_array_equal(
+            s0, s1, err_msg=("Identical seeds produced different initial states")
+        )
 
     def test_deterministic_trajectory(self):
         """Same seed + same actions → identical trajectory."""
@@ -450,22 +452,20 @@ class TestDeterminism:
             states = []
             for _ in range(10):
                 e.step(_make_action(0.5))
-                states.append(
-                    np.asarray(e.get_state(), dtype=OBS_DTYPE).copy()
-                )
+                states.append(np.asarray(e.get_state(), dtype=OBS_DTYPE).copy())
             trajectories.append(states)
 
-        for i, (a, b) in enumerate(zip(trajectories[0], trajectories[1])):
-            np.testing.assert_array_equal(a, b, err_msg=(
-                f"Trajectories diverged at step {i}"
-            ))
+        for i, (a, b) in enumerate(zip(trajectories[0], trajectories[1], strict=False)):
+            np.testing.assert_array_equal(
+                a, b, err_msg=(f"Trajectories diverged at step {i}")
+            )
 
     def test_different_seeds_differ(self):
         """Different seeds should (usually) produce different states."""
         envs = [HouseEnv(), HouseEnv()]
         seeds = [42, 99]
         states = []
-        for e, s in zip(envs, seeds):
+        for e, s in zip(envs, seeds, strict=False):
             if not self._try_seed(e, s):
                 pytest.skip("Seeding not supported")
             e.reset()
@@ -484,8 +484,8 @@ class TestDeterminism:
 # 9. Edge cases and robustness
 # ===========================================================================
 
-class TestEdgeCases:
 
+class TestEdgeCases:
     def test_step_before_reset(self, env):
         """
         Must either work (implicit reset) or raise a clear error.
@@ -523,6 +523,7 @@ class TestEdgeCases:
 # 10. gym.Env interface compliance (informational)
 # ===========================================================================
 
+
 class TestGymCompliance:
     """
     Optional checks for standard gym.Env attributes.
@@ -550,8 +551,7 @@ class TestGymCompliance:
         space = env.action_space
         if hasattr(space, "shape"):
             assert space.shape == (ACTION_DIM,), (
-                f"Expected action_space shape ({ACTION_DIM},), "
-                f"got {space.shape}"
+                f"Expected action_space shape ({ACTION_DIM},), got {space.shape}"
             )
 
     def test_observation_space_shape_if_present(self, env):
@@ -560,6 +560,5 @@ class TestGymCompliance:
         space = env.observation_space
         if hasattr(space, "shape"):
             assert space.shape == (OBS_DIM,), (
-                f"Expected observation_space shape ({OBS_DIM},), "
-                f"got {space.shape}"
+                f"Expected observation_space shape ({OBS_DIM},), got {space.shape}"
             )

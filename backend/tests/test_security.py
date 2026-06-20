@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 
-from app.core import security
-from app.core import settings
+from app.core import security, settings
 
 
 def test_hash_and_verify_password():

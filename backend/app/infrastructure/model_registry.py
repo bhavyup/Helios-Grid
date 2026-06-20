@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import json
 import logging
-from typing import Any, Dict
+from typing import Any
 
 import torch
 
@@ -20,11 +20,11 @@ def registry_enabled() -> bool:
 def store_training_artifacts(
     run_id: str,
     created_at: str,
-    params: Dict[str, Any],
-    training_summary: Dict[str, Any],
-    comparison: Dict[str, Any],
+    params: dict[str, Any],
+    training_summary: dict[str, Any],
+    comparison: dict[str, Any],
     model: torch.nn.Module,
-) -> Dict[str, str] | None:
+) -> dict[str, str] | None:
     if not registry_enabled():
         return None
 

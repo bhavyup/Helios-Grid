@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Optional, List
 
 
 def validate_and_resolve(
     file_path: str,
-    allowed_roots: Optional[Iterable[Path]] = None,
+    allowed_roots: Iterable[Path] | None = None,
     must_exist: bool = False,
 ) -> Path:
     """Resolve a user-supplied path safely and ensure it lies within allowed roots.

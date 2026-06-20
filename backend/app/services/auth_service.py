@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import hashlib
-from typing import Optional
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -40,15 +39,15 @@ def hash_refresh_token(token: str) -> str:
 def _normalize_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value.astimezone(UTC).replace(tzinfo=None)
 
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
+def get_user_by_email(db: Session, email: str) -> User | None:
     normalized = normalize_email(email)
     return db.query(User).filter(User.email == normalized).one_or_none()
 
 
-def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
+def get_user_by_id(db: Session, user_id: int) -> User | None:
     return db.query(User).filter(User.id == user_id).one_or_none()
 
 
@@ -69,7 +68,7 @@ def create_user(db: Session, email: str, password: str, role: str = "user") -> U
     return user
 
 
-def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+def authenticate_user(db: Session, email: str, password: str) -> User | None:
     user = get_user_by_email(db, email)
     if user is None:
         return None
@@ -129,7 +128,7 @@ def refresh_token_pair(db: Session, refresh_token: str) -> TokenPair:
         raise ValueError("Refresh token not recognized")
     if record.revoked_at is not None:
         raise ValueError("Refresh token has been revoked")
-    if _normalize_utc(record.expires_at) <= _normalize_utc(datetime.now(tz=timezone.utc)):
+    if _normalize_utc(record.expires_at) <= _normalize_utc(datetime.now(tz=UTC)):
         raise ValueError("Refresh token has expired")
     if record.token_hash != hash_refresh_token(refresh_token):
         raise ValueError("Refresh token mismatch")
@@ -139,7 +138,7 @@ def refresh_token_pair(db: Session, refresh_token: str) -> TokenPair:
         raise ValueError("User is inactive")
 
     if settings.refresh_token_rotate:
-        record.revoked_at = datetime.now(tz=timezone.utc)
+        record.revoked_at = datetime.now(tz=UTC)
         new_refresh_jti = str(uuid4())
         record.replaced_by_jti = new_refresh_jti
 
@@ -198,6 +197,6 @@ def revoke_refresh_token(db: Session, refresh_token: str) -> bool:
         return False
 
     if record.revoked_at is None:
-        record.revoked_at = datetime.now(tz=timezone.utc)
+        record.revoked_at = datetime.now(tz=UTC)
         db.commit()
     return True

@@ -1,22 +1,23 @@
 """GridEnv orchestrates grid simulation engines and household envs."""
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import numpy as np
 from gymnasium import Env
-from gymnasium.spaces import Dict as GymDict, Box, Discrete
+from gymnasium.spaces import Box, Discrete
+from gymnasium.spaces import Dict as GymDict
 from gymnasium.utils import seeding
 
 from app.core.project_config import config
 from app.domain.models.gnn_coordinator import GNNCoordinator
 from app.infrastructure.logging_utils import log_env_info
+from app.simulations.household_data_engine import HouseholdDataEngine
 from app.simulations.household_manager import HouseholdManager
+from app.simulations.market_data_engine import MarketDataEngine
 from app.simulations.market_engine import MarketEngine
 from app.simulations.reward_engine import RewardEngine
 from app.simulations.topology_engine import TopologyEngine
 from app.simulations.weather_engine import WeatherEngine
-from app.simulations.household_data_engine import HouseholdDataEngine
-from app.simulations.market_data_engine import MarketDataEngine
 
 
 class GridEnv(Env):
@@ -135,7 +136,7 @@ class GridEnv(Env):
     # Core gym interface
     # ------------------------------------------------------------------
 
-    def reset(self) -> Dict[str, np.ndarray]:
+    def reset(self) -> dict[str, np.ndarray]:
         """Reset the environment to the initial state."""
         self.current_time = 0
         self.episode_count += 1
@@ -155,8 +156,8 @@ class GridEnv(Env):
         return self._get_observation()
 
     def step(
-        self, actions: Dict[str, Any]
-    ) -> Tuple[Dict[str, np.ndarray], float, bool, dict]:
+        self, actions: dict[str, Any]
+    ) -> tuple[dict[str, np.ndarray], float, bool, dict]:
         """Execute one timestep."""
         self.episode_length += 1
 
@@ -236,7 +237,9 @@ class GridEnv(Env):
 
         if external_market_price is not None:
             try:
-                self.last_market_snapshot["external_market_price"] = float(external_market_price)
+                self.last_market_snapshot["external_market_price"] = float(
+                    external_market_price
+                )
             except Exception:
                 pass
         else:
@@ -286,7 +289,7 @@ class GridEnv(Env):
     # Observation helpers
     # ------------------------------------------------------------------
 
-    def _get_observation(self) -> Dict[str, np.ndarray]:
+    def _get_observation(self) -> dict[str, np.ndarray]:
         house_states = self.household_manager.get_states()
         return {
             "house_states": np.array(house_states, dtype=np.float32),
@@ -297,7 +300,7 @@ class GridEnv(Env):
         }
 
     @staticmethod
-    def _summarize_coordination_signals(signals: Any) -> Dict[str, float]:
+    def _summarize_coordination_signals(signals: Any) -> dict[str, float]:
         array = np.asarray(signals, dtype=np.float32)
         if array.size == 0:
             return {"mean": 0.0, "std": 0.0, "min": 0.0, "max": 0.0}

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Tuple
-
 import numpy as np
 from gymnasium import Env
 from gymnasium.spaces import Box
@@ -85,7 +83,7 @@ class HouseEnv(Env):
         # Optional external household demand signal (per-house baseline)
         try:
             if hasattr(self, "current_consumption_target"):
-                target = getattr(self, "current_consumption_target")
+                target = self.current_consumption_target
                 if target is not None:
                     base_load = float(max(0.0, target))
         except Exception:

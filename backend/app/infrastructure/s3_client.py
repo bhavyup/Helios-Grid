@@ -1,19 +1,15 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import boto3
-from botocore.config import Config
 from botocore.client import BaseClient
+from botocore.config import Config
 
 from app.core.settings import settings
 
 
 def create_s3_client() -> BaseClient:
     config = Config(
-        s3={
-            "addressing_style": "path" if settings.s3_force_path_style else "virtual"
-        }
+        s3={"addressing_style": "path" if settings.s3_force_path_style else "virtual"}
     )
 
     client_kwargs: dict[str, object] = {

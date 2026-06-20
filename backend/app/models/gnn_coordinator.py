@@ -1,13 +1,12 @@
-
-import random
 import logging
+import random
 from datetime import datetime
-from typing import Any, List, Dict, Tuple
+from typing import Any
 
+import networkx as nx
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import networkx as nx
 
 from app.core.project_config import config
 from app.utils.graph_utils import get_edges, get_node_types
@@ -92,7 +91,9 @@ class GNNCoordinator:
                     nn.Linear(hidden_dim, output_dim),
                 )
 
-            def forward(self, x: torch.Tensor, edge_index: torch.Tensor) -> torch.Tensor:
+            def forward(
+                self, x: torch.Tensor, edge_index: torch.Tensor
+            ) -> torch.Tensor:
                 """
                 Forward pass for the placeholder GNN.
 
@@ -112,7 +113,7 @@ class GNNCoordinator:
         # so input_dim=1. Output target is also the type ID, so output_dim=1.
         input_dim = 1
         output_dim = 1
-        hidden_dim = 64 # Arbitrary hidden dimension for the placeholder MLP
+        hidden_dim = 64  # Arbitrary hidden dimension for the placeholder MLP
 
         return PlaceholderGNN(input_dim, hidden_dim, output_dim)
 
@@ -126,17 +127,21 @@ class GNNCoordinator:
         # Ensure mapping to contiguous 0-indexed IDs is used
         sorted_nodes = [self.idx_to_node[i] for i in range(len(self.graph.nodes))]
 
-        node_type_ids = torch.tensor(
-            [
-                1.0
-                if node_types[node] == "household"
-                else 2.0
-                if node_types[node] == "solar"
-                else 3.0
-                for node in sorted_nodes
-            ],
-            dtype=torch.float32,
-        ).unsqueeze(1).to(self.device)
+        node_type_ids = (
+            torch.tensor(
+                [
+                    1.0
+                    if node_types[node] == "household"
+                    else 2.0
+                    if node_types[node] == "solar"
+                    else 3.0
+                    for node in sorted_nodes
+                ],
+                dtype=torch.float32,
+            )
+            .unsqueeze(1)
+            .to(self.device)
+        )
         return node_type_ids
 
     # NOTE: _get_edge_features is currently unused by _build_model
@@ -149,10 +154,12 @@ class GNNCoordinator:
         This method is currently not used by the placeholder GNN model.
         """
         edges = get_edges(self.graph)
-        edge_weights = torch.tensor([e[2] for e in edges], dtype=torch.float32).unsqueeze(1)
+        edge_weights = torch.tensor(
+            [e[2] for e in edges], dtype=torch.float32
+        ).unsqueeze(1)
         return edge_weights.to(self.device)
 
-    def _get_graph_data(self) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _get_graph_data(self) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Prepares node features and edge index for the GNN model.
         """
@@ -187,7 +194,7 @@ class GNNCoordinator:
         pass
 
     def compute_coordination_signals(
-        self, house_states: List[Any], graph: nx.Graph, weather_data: Any
+        self, house_states: list[Any], graph: nx.Graph, weather_data: Any
     ) -> Any:
         """
         Computes coordination signals for households based on current state and weather.
@@ -204,18 +211,21 @@ class GNNCoordinator:
         Returns:
             Any: Placeholder for actual coordination signals.
         """
-        self.model.eval() # Set model to evaluation mode
+        self.model.eval()  # Set model to evaluation mode
         with torch.no_grad():
             x, edge_index = self._get_graph_data()
             # NOTE: If house_states, graph, weather_data were to be inputs for the GNN,
             # they would need to be incorporated into x or edge_attr, etc.
             # Currently, only node type features are used.
             output = self.model(x, edge_index)
-        
+
         # Placeholder for actual coordination signal interpretation
         # e.g., output could be node-wise energy recommendations, price signals, etc.
-        logger.debug("Computed coordination signals (placeholder output mean: %.4f)", output.mean().item())
-        return output.cpu().numpy() # Return numpy array for compatibility
+        logger.debug(
+            "Computed coordination signals (placeholder output mean: %.4f)",
+            output.mean().item(),
+        )
+        return output.cpu().numpy()  # Return numpy array for compatibility
 
     def train(self, num_epochs: int = 100) -> None:
         """
@@ -230,7 +240,9 @@ class GNNCoordinator:
             self.model.train()
             self.optimizer.zero_grad()
             output = self.model(x, edge_index)
-            loss = self.criterion(output, x)  # Placeholder: model learns to reconstruct its input
+            loss = self.criterion(
+                output, x
+            )  # Placeholder: model learns to reconstruct its input
 
             loss.backward()
             self.optimizer.step()
@@ -238,7 +250,9 @@ class GNNCoordinator:
             if (epoch + 1) % 10 == 0 or epoch == num_epochs - 1:
                 logger.info(
                     "GNN Train - Epoch %d/%d, Loss: %.4f",
-                    epoch + 1, num_epochs, loss.item()
+                    epoch + 1,
+                    num_epochs,
+                    loss.item(),
                 )
 
             # NOTE: Logged training data metrics are currently placeholders
@@ -246,7 +260,7 @@ class GNNCoordinator:
             # with actual relevant metrics for research validity.
             log_training_data(
                 log_dir=self.log_dir,
-                episode=epoch + 1, # Using epoch as episode for logging
+                episode=epoch + 1,  # Using epoch as episode for logging
                 total_reward=loss.item(),
                 avg_house_reward=loss.item(),
                 avg_market_reward=loss.item(),
@@ -258,7 +272,7 @@ class GNNCoordinator:
         """
         Runs a forward pass of the GNN model and logs simulation data.
         """
-        self.model.eval() # Set model to evaluation mode
+        self.model.eval()  # Set model to evaluation mode
         with torch.no_grad():
             x, edge_index = self._get_graph_data()
             output = self.model(x, edge_index)
@@ -269,7 +283,9 @@ class GNNCoordinator:
         # The timestamp fallback also needs to be deterministic if not provided.
         log_simulation_data(
             log_dir=self.log_dir,
-            timestamp="2023-01-01T00:00:00" if self.seed is not None else datetime.now().isoformat(), # Deterministic placeholder
+            timestamp="2023-01-01T00:00:00"
+            if self.seed is not None
+            else datetime.now().isoformat(),  # Deterministic placeholder
             grid_balance=output.mean().item(),
             market_balance=output.mean().item(),
             household_consumption=output.mean().item(),

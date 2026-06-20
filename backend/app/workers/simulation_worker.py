@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import ray
 
@@ -16,7 +16,7 @@ def run_simulation(
     weather_data_path: str | None,
     use_autopilot: bool,
     market_action: int | None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     service = SimulationService()
     service.reset(
         seed=seed,

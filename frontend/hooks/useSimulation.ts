@@ -152,7 +152,7 @@ export function useSimulation(): UseSimulationState {
     }
 
     setSimulationState(incoming);
-  }, []);
+  }, [setSimulationState]);
 
   const refreshSnapshot = useCallback(async () => {
     try {

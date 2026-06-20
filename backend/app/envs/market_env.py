@@ -22,8 +22,6 @@ ASSUMPTIONS (unverified — require source files)
 """
 
 import numpy as np
-from typing import Tuple
-
 from gymnasium import Env
 from gymnasium.spaces import Box, Discrete
 from gymnasium.utils import seeding
@@ -69,9 +67,7 @@ class MarketEnv(Env):
         self._max_steps: int = len(self.market_data)
 
         if self._max_steps == 0:
-            raise ValueError(
-                f"market_data is empty after loading: {market_data_file}"
-            )
+            raise ValueError(f"market_data is empty after loading: {market_data_file}")
 
         # --- state variables (set properly in reset) ---------------------
         self.current_time: int = 0
@@ -79,14 +75,17 @@ class MarketEnv(Env):
         self.total_demand: float = 0.0
         self.energy_price: float = 0.0
         self.prev_price: float = 0.0
-        self.net_position: float = 0.0   # cumulative buy(+) / sell(-)
+        self.net_position: float = 0.0  # cumulative buy(+) / sell(-)
         self.total_reward: float = 0.0
 
         # --- spaces ------------------------------------------------------
         self.num_actions: int = 3  # hold, buy, sell
         self.action_space = Discrete(self.num_actions)
         self.observation_space = Box(
-            low=-np.inf, high=np.inf, shape=(5,), dtype=np.float32,
+            low=-np.inf,
+            high=np.inf,
+            shape=(5,),
+            dtype=np.float32,
         )
 
         # --- deterministic RNG -------------------------------------------
@@ -121,9 +120,7 @@ class MarketEnv(Env):
 
         return self._get_observation()
 
-    def step(
-        self, action: int
-    ) -> Tuple[np.ndarray, float, bool, dict]:
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, dict]:
         """
         Execute one timestep.
 

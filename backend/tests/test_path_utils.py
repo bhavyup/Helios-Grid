@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
@@ -15,7 +14,9 @@ def test_resolve_with_allowed_root(tmp_path):
     f.parent.mkdir(parents=True)
     f.write_text("hello")
 
-    resolved = validate_and_resolve("subdir/file.txt", allowed_roots=allowed, must_exist=True)
+    resolved = validate_and_resolve(
+        "subdir/file.txt", allowed_roots=allowed, must_exist=True
+    )
     assert resolved.exists()
     assert resolved == f.resolve()
 

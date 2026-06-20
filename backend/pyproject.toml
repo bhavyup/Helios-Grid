@@ -59,11 +59,22 @@ line-length = 88
 target-version = ["py311"]
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N"]
+
+[tool.ruff.lint.per-file-ignores]
+# FastAPI's Depends/File in argument defaults is the documented pattern.
+"app/api/**/*.py" = ["B008"]
+# torch.nn.functional is conventionally aliased as F (PyTorch ecosystem convention).
+"app/models/ppo_agent.py" = ["N812"]
+"app/domain/models/ppo_agent.py" = ["N812"]
+# G is the idiomatic NetworkX variable name for a graph object.
+"app/utils/graph_utils.py" = ["N806"]
+# Local rename `_H = HouseEnv` is intentional for contract test assertions.
+"tests/test_house_env.py" = ["N814"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

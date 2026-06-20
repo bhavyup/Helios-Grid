@@ -1,11 +1,14 @@
-"""Compatibility wrapper for MarketAgent."""
+"""Compatibility wrapper for MarketAgent.
 
-from app.domain.agents.market_agent import MarketAgent
+MarketAgent — Placeholder market agent scaffold for future decentralized market policies.
+"""
 
-__all__ = ["MarketAgent"]"""Temporary placeholder for future market-agent policy implementation."""
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-class MarketAgent:
+class MarketAgent:  # noqa: F811
     """Placeholder market agent scaffold for future decentralized market policies."""
 
     def __init__(self, *args, **kwargs) -> None:

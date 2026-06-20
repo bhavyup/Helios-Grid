@@ -24,7 +24,7 @@ All edges have ``weight=1.0`` by default.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import networkx as nx
 
@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 # ===================================================================
 # Graph construction
 # ===================================================================
+
 
 def create_grid_graph(
     num_households: int = 10,
@@ -133,36 +134,29 @@ def build_grid_graph(
 # Node queries
 # ===================================================================
 
-def get_node_types(graph: nx.Graph) -> Dict[int, str]:
+
+def get_node_types(graph: nx.Graph) -> dict[int, str]:
     """
     Return a mapping of node ID → type string.
 
     Nodes without a ``type`` attribute are labeled ``"unknown"``.
     """
-    return {
-        node: data.get("type", "unknown")
-        for node, data in graph.nodes(data=True)
-    }
+    return {node: data.get("type", "unknown") for node, data in graph.nodes(data=True)}
 
 
-def get_node_labels(graph: nx.Graph) -> Dict[int, str]:
+def get_node_labels(graph: nx.Graph) -> dict[int, str]:
     """
     Return a mapping of node ID → human-readable label.
     """
-    return {
-        node: data.get("label", str(node))
-        for node, data in graph.nodes(data=True)
-    }
+    return {node: data.get("label", str(node)) for node, data in graph.nodes(data=True)}
 
 
-def get_nodes_by_type(graph: nx.Graph, node_type: str) -> List[int]:
+def get_nodes_by_type(graph: nx.Graph, node_type: str) -> list[int]:
     """
     Return a list of node IDs that have the given type.
     """
     return [
-        node
-        for node, data in graph.nodes(data=True)
-        if data.get("type") == node_type
+        node for node, data in graph.nodes(data=True) if data.get("type") == node_type
     ]
 
 
@@ -174,54 +168,48 @@ def get_subgraph_by_type(graph: nx.Graph, node_type: str) -> nx.Graph:
     return graph.subgraph(nodes)
 
 
-def get_neighbors(graph: nx.Graph, node: int) -> List[int]:
+def get_neighbors(graph: nx.Graph, node: int) -> list[int]:
     """Return the neighbor node IDs of the given node."""
     return list(graph.neighbors(node))
 
 
-def get_node_attributes(graph: nx.Graph, node: int) -> Dict[str, Any]:
+def get_node_attributes(graph: nx.Graph, node: int) -> dict[str, Any]:
     """Return all attributes of a single node."""
     return dict(graph.nodes[node])
 
 
 def get_all_node_attributes(
     graph: nx.Graph,
-) -> Dict[int, Dict[str, Any]]:
+) -> dict[int, dict[str, Any]]:
     """Return attributes for every node."""
-    return {
-        node: dict(data)
-        for node, data in graph.nodes(data=True)
-    }
+    return {node: dict(data) for node, data in graph.nodes(data=True)}
 
 
 # ===================================================================
 # Edge queries
 # ===================================================================
 
-def get_edges(graph: nx.Graph) -> List[Tuple[int, int, float]]:
+
+def get_edges(graph: nx.Graph) -> list[tuple[int, int, float]]:
     """
     Return all edges as ``(src, dst, weight)`` triples.
 
     Edges without a ``weight`` attribute default to ``1.0``.
     """
-    return [
-        (u, v, data.get("weight", 1.0))
-        for u, v, data in graph.edges(data=True)
-    ]
+    return [(u, v, data.get("weight", 1.0)) for u, v, data in graph.edges(data=True)]
 
 
 def get_edge_attributes(
-    graph: nx.Graph, u: int, v: int,
-) -> Dict[str, Any]:
+    graph: nx.Graph,
+    u: int,
+    v: int,
+) -> dict[str, Any]:
     """Return all attributes of a single edge."""
     return dict(graph.edges[u, v])
 
 
 def get_all_edge_attributes(
     graph: nx.Graph,
-) -> Dict[Tuple[int, int], Dict[str, Any]]:
+) -> dict[tuple[int, int], dict[str, Any]]:
     """Return attributes for every edge."""
-    return {
-        (u, v): dict(data)
-        for u, v, data in graph.edges(data=True)
-    }
+    return {(u, v): dict(data) for u, v, data in graph.edges(data=True)}

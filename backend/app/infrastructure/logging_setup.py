@@ -3,14 +3,15 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from uuid import uuid4
 
 import structlog
 from fastapi import Request, Response
 from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
 
-from app.infrastructure.monitoring import record_error, observe_request
+from app.infrastructure.monitoring import observe_request, record_error
 
 
 def configure_logging() -> None:
@@ -53,7 +54,9 @@ def configure_logging() -> None:
     )
 
 
-async def request_logging_middleware(request: Request, call_next: Callable[[Request], Any]) -> Response:
+async def request_logging_middleware(
+    request: Request, call_next: Callable[[Request], Any]
+) -> Response:
     clear_contextvars()
     request_id = request.headers.get("x-request-id") or uuid4().hex
     trace_id = request.headers.get("x-trace-id") or uuid4().hex

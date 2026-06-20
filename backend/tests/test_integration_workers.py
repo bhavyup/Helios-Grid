@@ -62,7 +62,9 @@ def test_training_worker_returns_training_payload_without_mlflow(monkeypatch):
             return {"weights": 1}
 
     class FakeAgent:
-        def __init__(self, seed=None, learning_rate=None, hidden_dim=None, clip_epsilon=None):
+        def __init__(
+            self, seed=None, learning_rate=None, hidden_dim=None, clip_epsilon=None
+        ):
             calls["init"] = {
                 "seed": seed,
                 "learning_rate": learning_rate,
@@ -94,8 +96,12 @@ def test_training_worker_returns_training_payload_without_mlflow(monkeypatch):
 
     monkeypatch.setattr(training_worker, "PPOAgent", FakeAgent)
     monkeypatch.setattr(training_worker, "mlflow_enabled", lambda: False)
-    monkeypatch.setattr(training_worker, "log_training_run", lambda *args, **kwargs: None)
-    monkeypatch.setattr(training_worker, "store_training_artifacts", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        training_worker, "log_training_run", lambda *args, **kwargs: None
+    )
+    monkeypatch.setattr(
+        training_worker, "store_training_artifacts", lambda *args, **kwargs: None
+    )
     worker_fn = _unwrap_remote_call(training_worker.run_ppo_training)
 
     result = worker_fn(
@@ -117,7 +123,12 @@ def test_training_worker_returns_training_payload_without_mlflow(monkeypatch):
         "hidden_dim": 128,
         "clip_epsilon": 0.2,
     }
-    assert calls["train"] == {"episodes": 3, "steps_per_episode": 8, "num_envs": 2, "seed": 7}
+    assert calls["train"] == {
+        "episodes": 3,
+        "steps_per_episode": 8,
+        "num_envs": 2,
+        "seed": 7,
+    }
     assert calls["compare"] == {"episodes": 4, "steps_per_episode": 8, "seed": 10007}
     assert result["run_id"] == "ppo-test-1"
     assert result["created_at"] == "2026-05-26T00:00:00+00:00"

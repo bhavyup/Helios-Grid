@@ -47,6 +47,21 @@ class Settings(BaseSettings):
     rate_limit_default: str = "1000/hour"
     rate_limit_auth: str = "10/minute"
     rate_limit_simulation: str = "60/minute"
+
+    @property
+    def effective_rate_limit_default(self) -> str:
+        # In test mode, lift the rate-limit ceiling so test suites that
+        # register many users (or fire many requests per endpoint) are
+        # not throttled by slowapi.
+        return "1000000/second" if self.app_env == "test" else self.rate_limit_default
+
+    @property
+    def effective_rate_limit_auth(self) -> str:
+        return "1000000/second" if self.app_env == "test" else self.rate_limit_auth
+
+    @property
+    def effective_rate_limit_simulation(self) -> str:
+        return "1000000/second" if self.app_env == "test" else self.rate_limit_simulation
     # Secret backend configuration (optional)
     secret_backend: str = "env"  # env | vault | doppler
     vault_addr: str | None = None

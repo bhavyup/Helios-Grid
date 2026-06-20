@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_active_user, require_roles
-from app.infrastructure.rate_limiter import limiter
 from app.core.settings import settings
 from app.infrastructure.database import get_db
+from app.infrastructure.rate_limiter import limiter
 from app.repositories.db_models import User
 from app.services.auth_service import (
     TokenPair,
@@ -70,7 +69,7 @@ def _to_user_response(user: User) -> UserResponse:
 
 
 def _build_token_response(token_pair: TokenPair) -> TokenResponse:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     access_seconds = max(0, int((token_pair.access_expires_at - now).total_seconds()))
     refresh_seconds = max(
         0,
@@ -86,7 +85,7 @@ def _build_token_response(token_pair: TokenPair) -> TokenResponse:
 
 
 @router.post("/register", response_model=TokenResponse)
-@limiter.limit(settings.rate_limit_auth)
+@limiter.limit(settings.effective_rate_limit_auth)
 def register_user(
     request: Request,
     payload: RegisterRequest,
@@ -105,7 +104,7 @@ def register_user(
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit(settings.rate_limit_auth)
+@limiter.limit(settings.effective_rate_limit_auth)
 def login_user(
     request: Request,
     payload: LoginRequest,
@@ -128,7 +127,7 @@ def login_user(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-@limiter.limit(settings.rate_limit_auth)
+@limiter.limit(settings.effective_rate_limit_auth)
 def refresh_tokens(
     request: Request,
     payload: RefreshRequest,
@@ -145,7 +144,7 @@ def refresh_tokens(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit(settings.rate_limit_auth)
+@limiter.limit(settings.effective_rate_limit_auth)
 def logout_user(
     request: Request,
     payload: LogoutRequest,
@@ -166,10 +165,10 @@ def get_me(current_user: User = Depends(require_active_user)) -> UserResponse:
     return _to_user_response(current_user)
 
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users", response_model=list[UserResponse])
 def list_users(
     db: Session = Depends(get_db),
     _current_user: User | None = Depends(require_roles("admin")),
-) -> List[UserResponse]:
+) -> list[UserResponse]:
     users = db.query(User).order_by(User.id.asc()).all()
     return [_to_user_response(user) for user in users]

@@ -1,9 +1,5 @@
-"""Compatibility wrapper for HouseAgent."""
+"""Compatibility wrapper for HouseAgent.
 
-from app.domain.agents.house_agent import HouseAgent
-
-__all__ = ["HouseAgent"]
-"""
 HouseAgent — Rule-based household decision agent.
 
 ARCHITECTURAL NOTE
@@ -31,8 +27,7 @@ DEPENDENCY ASSUMPTIONS (unverified)
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -41,12 +36,11 @@ from app.core.project_config import config
 # Only imported if the agent needs to log independently.
 # In a well-integrated system the orchestrator handles logging;
 # the agent should not need this.  Retained for backward compat.
-from app.utils.logging_utils import log_simulation_data
 
 logger = logging.getLogger(__name__)
 
 
-class HouseAgent:
+class HouseAgent:  # noqa: F811
     """
     Rule-based household agent.
 
@@ -83,8 +77,8 @@ class HouseAgent:
         max_consumption: float = 5.0,
         price_ceiling: float = 10.0,
         log_dir: str = config.LOG_DIR,
-        comm_layer: Optional[Any] = None,
-        seed: Optional[int] = None,
+        comm_layer: Any | None = None,
+        seed: int | None = None,
     ):
         self.house_id = house_id
         self.initial_energy = initial_energy
@@ -94,8 +88,8 @@ class HouseAgent:
         self.log_dir = log_dir
         self.running: bool = False
 
-        self.consumption_history: List[Tuple[int, float]] = []
-        self.price_history: List[Tuple[int, float]] = []
+        self.consumption_history: list[tuple[int, float]] = []
+        self.price_history: list[tuple[int, float]] = []
 
         # --- deterministic RNG -------------------------------------------
         self.rng = np.random.RandomState(seed)
@@ -132,9 +126,7 @@ class HouseAgent:
 
         return consumption
 
-    def make_decision(
-        self, price: float, time_step: int
-    ) -> Dict[str, Any]:
+    def make_decision(self, price: float, time_step: int) -> dict[str, Any]:
         """
         Decide how much to consume at the given price.
 
@@ -163,7 +155,7 @@ class HouseAgent:
     # State query
     # ==================================================================
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Return a snapshot of the agent's current state."""
         return {
             "house_id": self.house_id,
@@ -172,7 +164,7 @@ class HouseAgent:
             "price_history": list(self.price_history),
         }
 
-    def get_consumption_history(self) -> List[Tuple[int, float]]:
+    def get_consumption_history(self) -> list[tuple[int, float]]:
         """Return the full consumption history as (timestep, value) pairs."""
         return list(self.consumption_history)
 
@@ -186,7 +178,7 @@ class HouseAgent:
     # Communication (optional)
     # ==================================================================
 
-    def communicate(self, message: Dict[str, Any]) -> None:
+    def communicate(self, message: dict[str, Any]) -> None:
         """
         Handle an inbound message.
 
@@ -215,14 +207,16 @@ class HouseAgent:
         decision = self.make_decision(float(price), int(time_step))
 
         if self._comm_layer is not None:
-            self._comm_layer.send_message({
-                "component_type": "agent",
-                "agent_id": self.house_id,
-                "time_step": time_step,
-                "price": decision["price"],
-                "consumption": decision["consumption"],
-                "energy": decision["energy"],
-            })
+            self._comm_layer.send_message(
+                {
+                    "component_type": "agent",
+                    "agent_id": self.house_id,
+                    "time_step": time_step,
+                    "price": decision["price"],
+                    "consumption": decision["consumption"],
+                    "energy": decision["energy"],
+                }
+            )
 
     # ==================================================================
     # Standalone run loop
@@ -256,14 +250,16 @@ class HouseAgent:
 
                 # --- send via comm layer if available --------------------
                 if self._comm_layer is not None:
-                    self._comm_layer.send_message({
-                        "component_type": "agent",
-                        "agent_id": self.house_id,
-                        "time_step": step,
-                        "price": decision["price"],
-                        "consumption": decision["consumption"],
-                        "energy": decision["energy"],
-                    })
+                    self._comm_layer.send_message(
+                        {
+                            "component_type": "agent",
+                            "agent_id": self.house_id,
+                            "time_step": step,
+                            "price": decision["price"],
+                            "consumption": decision["consumption"],
+                            "energy": decision["energy"],
+                        }
+                    )
 
                 logger.info(
                     "House %d — Step %d/%d — "

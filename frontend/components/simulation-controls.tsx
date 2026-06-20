@@ -13,7 +13,7 @@ import {
   Sparkles,
   StepForward,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CsvProfilePayload,
@@ -40,6 +40,34 @@ type ControlTab =
   | "market"
   | "inspect"
   | "automation";
+
+const findIrradianceAlternative = (
+  columns: string[],
+  excluded: string,
+): string => {
+  const candidates = columns.filter(
+    (column) => column.toLowerCase() !== excluded.toLowerCase(),
+  );
+  return (
+    candidates.find((column) =>
+      /irradiance|solar_irradiance|ghi|dni|dhi/i.test(column),
+    ) ?? ""
+  );
+};
+
+const findPvPowerAlternative = (
+  columns: string[],
+  excluded: string,
+): string => {
+  const candidates = columns.filter(
+    (column) => column.toLowerCase() !== excluded.toLowerCase(),
+  );
+  return (
+    candidates.find((column) =>
+      /pv_power|pv_generation|pv_output|generation/i.test(column),
+    ) ?? ""
+  );
+};
 
 interface SimulationControlsProps {
   mode: PolicyMode;
@@ -809,69 +837,7 @@ export function SimulationControls({
     }
     lastProfileAutoFillRef.current = profileKey;
 
-    // Reset role-specific mappings when a new CSV profile arrives.
-    setSolarColumnInput("");
-    setWindColumnInput("");
-    setTimestampColumnInput("");
-    setTemperatureColumnInput("");
-    setHumidityColumnInput("");
-    setGhiColumnInput("");
-    setDniColumnInput("");
-    setDhiColumnInput("");
-    setIrradianceColumnInput("");
-    setPvPowerColumnInput("");
-    setConsumptionColumnInput("");
-    setHouseholdIdColumnInput("");
-    setPvGenerationColumnInput("");
-    setNetLoadColumnInput("");
-    setMeterColumnInput("");
-    setDemandColumnInput("");
-    setPriceColumnInput("");
-    setAskColumnInput("");
-    setBidColumnInput("");
-    setQuantityColumnInput("");
-    setClearingPriceColumnInput("");
-
-    const columns = csvProfile.columns ?? [];
-    let nextIrradiance = suggestedColumns.irradiance ?? "";
-    let nextPvPower = suggestedColumns.pvPower ?? "";
-
-    warningDetails.forEach((warning) => {
-      const flagged = warning.column?.trim();
-      if (!flagged || flagged === "unknown") {
-        return;
-      }
-
-      if (warning.kind === "likely_generation_not_irradiance") {
-        if (nextIrradiance.toLowerCase() === flagged.toLowerCase()) {
-          if (!nextPvPower) {
-            nextPvPower = flagged;
-          }
-          nextIrradiance = findIrradianceAlternative(columns, flagged);
-        }
-      }
-
-      if (warning.kind === "likely_irradiance_not_generation") {
-        if (nextPvPower.toLowerCase() === flagged.toLowerCase()) {
-          if (!nextIrradiance) {
-            nextIrradiance = flagged;
-          }
-          nextPvPower = findPvPowerAlternative(columns, flagged);
-        }
-      }
-    });
-
-    setSolarColumnInput(suggestedColumns.solar ?? "");
-    setWindColumnInput(suggestedColumns.wind ?? "");
-    setTimestampColumnInput(suggestedColumns.timestamp ?? "");
-    setTemperatureColumnInput(suggestedColumns.temperature ?? "");
-    setHumidityColumnInput(suggestedColumns.humidity ?? "");
-    setGhiColumnInput(suggestedColumns.ghi ?? "");
-    setDniColumnInput(suggestedColumns.dni ?? "");
-    setDhiColumnInput(suggestedColumns.dhi ?? "");
-    setIrradianceColumnInput(nextIrradiance);
-    setPvPowerColumnInput(nextPvPower);
-
+    // Default solar panel parameters if the user has not entered any yet.
     if (!panelTiltInput) {
       setPanelTiltInput("30");
     }
@@ -887,8 +853,6 @@ export function SimulationControls({
     if (!tempCoefficientInput) {
       setTempCoefficientInput("-0.004");
     }
-
-    applySmartAutoFillFromProfile();
   }, [
     csvProfile,
     panelTiltInput,
@@ -896,9 +860,6 @@ export function SimulationControls({
     panelAreaInput,
     panelEfficiencyInput,
     tempCoefficientInput,
-    suggestedColumns,
-    warningSignature,
-    warningDetails,
   ]);
 
   useEffect(() => {
@@ -1327,35 +1288,7 @@ export function SimulationControls({
   const getWarningForValue = (value: string) =>
     warningByColumn.get(value.trim().toLowerCase()) ?? null;
 
-  const findIrradianceAlternative = (
-    columns: string[],
-    excluded: string,
-  ): string => {
-    const candidates = columns.filter(
-      (column) => column.toLowerCase() !== excluded.toLowerCase(),
-    );
-    return (
-      candidates.find((column) =>
-        /irradiance|solar_irradiance|ghi|dni|dhi/i.test(column),
-      ) ?? ""
-    );
-  };
-
-  const findPvPowerAlternative = (
-    columns: string[],
-    excluded: string,
-  ): string => {
-    const candidates = columns.filter(
-      (column) => column.toLowerCase() !== excluded.toLowerCase(),
-    );
-    return (
-      candidates.find((column) =>
-        /pv_power|pv_generation|pv_output|generation/i.test(column),
-      ) ?? ""
-    );
-  };
-
-  const applySmartAutoFillFromProfile = () => {
+  const applySmartAutoFillFromProfile = useCallback(() => {
     if (!csvProfile) {
       return;
     }
@@ -1435,7 +1368,18 @@ export function SimulationControls({
     setMarketDemandColumnInput(demand);
     setQuantityColumnInput(quantity);
     setClearingPriceColumnInput(clearingPrice);
-  };
+  }, [csvProfile, suggestedColumns, warningDetails]);
+
+  useEffect(() => {
+    if (!csvProfile) {
+      return;
+    }
+    const profileKey = `${csvProfile.resolved_path}|${csvProfile.selected_role}|${csvProfile.columns.join("|")}`;
+    if (lastProfileAutoFillRef.current === profileKey) {
+      return;
+    }
+    applySmartAutoFillFromProfile();
+  }, [applySmartAutoFillFromProfile, csvProfile]);
 
   const applySafeWeatherFixes = (): void => {
     applySmartAutoFillFromProfile();

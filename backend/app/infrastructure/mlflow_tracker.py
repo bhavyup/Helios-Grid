@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from typing import Any, Dict, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import mlflow
 import torch
@@ -25,9 +26,9 @@ def configure_mlflow() -> None:
 
 def log_training_run(
     run_name: str,
-    params: Dict[str, Any],
-    training_summary: Dict[str, Any],
-    comparison: Dict[str, Any],
+    params: dict[str, Any],
+    training_summary: dict[str, Any],
+    comparison: dict[str, Any],
     model: torch.nn.Module | None = None,
 ) -> str | None:
     if not mlflow_enabled():
@@ -49,13 +50,13 @@ def log_training_run(
         return None
 
 
-def _log_params(params: Dict[str, Any]) -> None:
+def _log_params(params: dict[str, Any]) -> None:
     cleaned = {key: value for key, value in params.items() if value is not None}
     if cleaned:
         mlflow.log_params(cleaned)
 
 
-def _log_training_summary(training_summary: Dict[str, Any]) -> None:
+def _log_training_summary(training_summary: dict[str, Any]) -> None:
     reward_curve = training_summary.get("reward_curve", [])
 
     for entry in _iter_reward_curve(reward_curve):
@@ -66,8 +67,12 @@ def _log_training_summary(training_summary: Dict[str, Any]) -> None:
         _log_metric("value_loss", entry.get("value_loss"), step)
         _log_metric("entropy", entry.get("entropy"), step)
 
-    _log_metric("final_training_reward", training_summary.get("final_training_reward"), None)
-    _log_metric("best_training_reward", training_summary.get("best_training_reward"), None)
+    _log_metric(
+        "final_training_reward", training_summary.get("final_training_reward"), None
+    )
+    _log_metric(
+        "best_training_reward", training_summary.get("best_training_reward"), None
+    )
     _log_metric("duration_seconds", training_summary.get("duration_seconds"), None)
 
     final_eval = training_summary.get("final_eval_metrics", {})
@@ -81,7 +86,7 @@ def _log_training_summary(training_summary: Dict[str, Any]) -> None:
     mlflow.log_dict(training_summary, "training_summary.json")
 
 
-def _log_comparison_summary(comparison: Dict[str, Any]) -> None:
+def _log_comparison_summary(comparison: dict[str, Any]) -> None:
     if not comparison:
         return
 
@@ -132,7 +137,7 @@ def _log_metric(name: str, value: Any, step: int | None) -> None:
         mlflow.log_metric(name, metric_value, step=step)
 
 
-def _iter_reward_curve(reward_curve: Iterable[Dict[str, Any]]):
+def _iter_reward_curve(reward_curve: Iterable[dict[str, Any]]):
     for entry in reward_curve:
         if isinstance(entry, dict):
             yield entry

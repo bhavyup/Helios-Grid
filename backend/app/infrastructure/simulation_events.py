@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from app.core.settings import settings
 from app.infrastructure.redis_client import redis_client
@@ -10,7 +10,7 @@ from app.infrastructure.redis_client import redis_client
 logger = logging.getLogger(__name__)
 
 
-def publish_simulation_event(event_type: str, payload: Dict[str, Any]) -> None:
+def publish_simulation_event(event_type: str, payload: dict[str, Any]) -> None:
     if not settings.simulation_ws_enabled:
         return
 

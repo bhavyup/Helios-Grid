@@ -30,11 +30,11 @@ import json
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 from app.infrastructure.path_utils import validate_and_resolve
 
@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 # ===================================================================
 # JSON serialization safety
 # ===================================================================
+
 
 class _SafeEncoder(json.JSONEncoder):
     """
@@ -65,6 +66,7 @@ class _SafeEncoder(json.JSONEncoder):
         # torch tensors -- guard import
         try:
             import torch
+
             if isinstance(obj, torch.Tensor):
                 return obj.detach().cpu().numpy().tolist()
         except ImportError:
@@ -76,9 +78,10 @@ class _SafeEncoder(json.JSONEncoder):
 # Directory management
 # ===================================================================
 
+
 def create_log_directory(
     base_dir: str = "logs",
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
 ) -> str:
     """
     Create and return a log directory path.
@@ -107,9 +110,10 @@ def _ensure_dir(log_dir: str) -> None:
 # Core persistence
 # ===================================================================
 
+
 def append_log_entry(
     log_dir: str,
-    entry: Dict[str, Any],
+    entry: dict[str, Any],
     filename: str = "log.jsonl",
 ) -> None:
     """
@@ -122,14 +126,16 @@ def append_log_entry(
     file_path = os.path.join(log_dir, filename)
     backend_root = Path(__file__).resolve().parents[2]
     workspace_root = backend_root.parent
-    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+    resolved = validate_and_resolve(
+        file_path, allowed_roots=[backend_root, workspace_root], must_exist=False
+    )
     with resolved.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, cls=_SafeEncoder) + "\n")
 
 
 def save_log_entry(
     log_dir: str,
-    entry: Dict[str, Any],
+    entry: dict[str, Any],
     filename: str = "log_entry.json",
 ) -> None:
     """
@@ -144,7 +150,9 @@ def save_log_entry(
     file_path = os.path.join(log_dir, filename)
     backend_root = Path(__file__).resolve().parents[2]
     workspace_root = backend_root.parent
-    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+    resolved = validate_and_resolve(
+        file_path, allowed_roots=[backend_root, workspace_root], must_exist=False
+    )
     with resolved.open("w", encoding="utf-8") as f:
         json.dump(entry, f, indent=4, cls=_SafeEncoder)
 
@@ -153,9 +161,10 @@ def save_log_entry(
 # CSV utilities
 # ===================================================================
 
+
 def save_logs_to_csv(
     log_dir: str,
-    logs: List[Dict[str, Any]],
+    logs: list[dict[str, Any]],
     filename: str = "logs.csv",
 ) -> None:
     """Save a list of log dicts to a CSV file."""
@@ -164,22 +173,26 @@ def save_logs_to_csv(
     file_path = os.path.join(log_dir, filename)
     backend_root = Path(__file__).resolve().parents[2]
     workspace_root = backend_root.parent
-    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+    resolved = validate_and_resolve(
+        file_path, allowed_roots=[backend_root, workspace_root], must_exist=False
+    )
     df.to_csv(resolved, index=False)
 
 
-def load_logs_from_csv(file_path: str) -> List[Dict[str, Any]]:
+def load_logs_from_csv(file_path: str) -> list[dict[str, Any]]:
     """Load logs from a CSV file into a list of dicts."""
     backend_root = Path(__file__).resolve().parents[2]
     workspace_root = backend_root.parent
-    resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=True)
+    resolved = validate_and_resolve(
+        file_path, allowed_roots=[backend_root, workspace_root], must_exist=True
+    )
     df = pd.read_csv(resolved)
     return df.to_dict(orient="records")
 
 
 def export_jsonl_to_csv(
     jsonl_path: str,
-    csv_path: Optional[str] = None,
+    csv_path: str | None = None,
 ) -> str:
     """
     Convert a JSONL log file to CSV.
@@ -198,7 +211,9 @@ def export_jsonl_to_csv(
         csv_path = os.path.splitext(jsonl_path)[0] + ".csv"
     entries = load_logs_from_jsonl(jsonl_path)
     if entries:
-        resolved = validate_and_resolve(csv_path, allowed_roots=[backend_root, workspace_root], must_exist=False)
+        resolved = validate_and_resolve(
+            csv_path, allowed_roots=[backend_root, workspace_root], must_exist=False
+        )
         pd.DataFrame(entries).to_csv(resolved, index=False)
         return str(resolved)
     logger.warning("No entries in %s -- CSV not written.", jsonl_path)
@@ -209,17 +224,20 @@ def export_jsonl_to_csv(
 # JSONL reading
 # ===================================================================
 
-def load_logs_from_jsonl(file_path: str) -> List[Dict[str, Any]]:
+
+def load_logs_from_jsonl(file_path: str) -> list[dict[str, Any]]:
     """Load all entries from a JSONL file."""
     backend_root = Path(__file__).resolve().parents[2]
     workspace_root = backend_root.parent
     try:
-        resolved = validate_and_resolve(file_path, allowed_roots=[backend_root, workspace_root], must_exist=True)
+        resolved = validate_and_resolve(
+            file_path, allowed_roots=[backend_root, workspace_root], must_exist=True
+        )
     except FileNotFoundError:
         logger.warning("JSONL file not found: %s", file_path)
         return []
 
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     with resolved.open("r", encoding="utf-8") as f:
         for line_num, line in enumerate(f, 1):
             line = line.strip()
@@ -238,6 +256,7 @@ def load_logs_from_jsonl(file_path: str) -> List[Dict[str, Any]]:
 # Domain-specific loggers
 # ===================================================================
 
+
 def log_training_data(
     log_dir: str,
     episode: int,
@@ -246,7 +265,7 @@ def log_training_data(
     avg_market_reward: float,
     avg_grid_reward: float,
     step: int,
-    timestamp: Optional[str] = None,
+    timestamp: str | None = None,
 ) -> None:
     """
     Log a single training step / epoch.
@@ -306,7 +325,7 @@ def log_env_info(
     step: int,
     current_time: int,
     reward: float,
-    log_dir: Optional[str] = None,
+    log_dir: str | None = None,
 ) -> None:
     """
     Log per-step environment info.
@@ -327,13 +346,16 @@ def log_env_info(
     else:
         logger.info(
             "env step -- episode=%d step=%d time=%d reward=%.4f",
-            episode, step, current_time, reward,
+            episode,
+            step,
+            current_time,
+            reward,
         )
 
 
 def log_full_state(
     log_dir: str,
-    state: Dict[str, Any],
+    state: dict[str, Any],
     timestamp: str,
 ) -> None:
     """
@@ -355,12 +377,13 @@ def log_full_state(
 # Log retrieval
 # ===================================================================
 
+
 def get_log_file_path(log_dir: str, filename: str) -> str:
     """Return the full path for a log file in the given directory."""
     return os.path.join(log_dir, filename)
 
 
-def get_all_logs(log_dir: str) -> List[Dict[str, Any]]:
+def get_all_logs(log_dir: str) -> list[dict[str, Any]]:
     """
     Load all log entries from a directory.
 
@@ -369,12 +392,14 @@ def get_all_logs(log_dir: str) -> List[Dict[str, Any]]:
     backend_root = Path(__file__).resolve().parents[2]
     workspace_root = backend_root.parent
     try:
-        resolved_dir = validate_and_resolve(log_dir, allowed_roots=[backend_root, workspace_root], must_exist=True)
+        resolved_dir = validate_and_resolve(
+            log_dir, allowed_roots=[backend_root, workspace_root], must_exist=True
+        )
     except FileNotFoundError:
         logger.warning("Log directory not found: %s", log_dir)
         return []
 
-    logs: List[Dict[str, Any]] = []
+    logs: list[dict[str, Any]] = []
     for filename in sorted(os.listdir(resolved_dir)):
         file_path = os.path.join(str(resolved_dir), filename)
         if filename.endswith(".jsonl"):

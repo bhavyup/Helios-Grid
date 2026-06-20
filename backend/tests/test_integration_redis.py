@@ -21,14 +21,20 @@ def test_publish_simulation_event_serializes_payload(monkeypatch):
     fake_redis = _FakeRedis()
     monkeypatch.setattr(simulation_events, "redis_client", fake_redis, raising=False)
     monkeypatch.setattr(settings, "simulation_ws_enabled", True, raising=False)
-    monkeypatch.setattr(settings, "simulation_pubsub_channel", "tests.simulations", raising=False)
+    monkeypatch.setattr(
+        settings, "simulation_pubsub_channel", "tests.simulations", raising=False
+    )
 
-    simulation_events.publish_simulation_event("simulation.step", {"step": 1, "reward": 2.5})
+    simulation_events.publish_simulation_event(
+        "simulation.step", {"step": 1, "reward": 2.5}
+    )
 
     assert fake_redis.calls == [
         (
             "tests.simulations",
-            json.dumps({"type": "simulation.step", "payload": {"step": 1, "reward": 2.5}}),
+            json.dumps(
+                {"type": "simulation.step", "payload": {"step": 1, "reward": 2.5}}
+            ),
         )
     ]
 
@@ -54,9 +60,15 @@ def test_redis_client_factories_use_settings_url(monkeypatch):
         captured_async["decode_responses"] = decode_responses
         return _DummyRedis(captured_async)
 
-    monkeypatch.setattr(redis_client_module.redis.Redis, "from_url", fake_sync_from_url, raising=False)
-    monkeypatch.setattr(redis_pubsub_module.redis.Redis, "from_url", fake_async_from_url, raising=False)
-    monkeypatch.setattr(settings, "redis_url", "redis://localhost:6380/1", raising=False)
+    monkeypatch.setattr(
+        redis_client_module.redis.Redis, "from_url", fake_sync_from_url, raising=False
+    )
+    monkeypatch.setattr(
+        redis_pubsub_module.redis.Redis, "from_url", fake_async_from_url, raising=False
+    )
+    monkeypatch.setattr(
+        settings, "redis_url", "redis://localhost:6380/1", raising=False
+    )
     monkeypatch.setattr(settings, "redis_decode_responses", False, raising=False)
 
     sync_client = redis_client_module.create_redis_client()

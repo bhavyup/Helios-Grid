@@ -57,11 +57,11 @@ def _install_ray_stub() -> None:
 
 _install_ray_stub()
 
-from fastapi.testclient import TestClient
-import pytest
+import pytest  # noqa: E402  (must come after conftest env configuration)
+from fastapi.testclient import TestClient  # noqa: E402  (must come after conftest env configuration)
 
-from app.infrastructure.database import Base, SessionLocal, engine
-from app.main import app
+from app.infrastructure.database import Base, SessionLocal, engine  # noqa: E402
+from app.main import app  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -1,6 +1,7 @@
 """HouseholdManager coordinates per-household environment instances."""
 
-from typing import Any, Callable, Dict, List
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 
@@ -33,19 +34,19 @@ class HouseholdManager:
         weather_datum: Any | None = None,
         household_datum: Any | None = None,
         market_datum: Any | None = None,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """Step all house environments forward.
 
         If `weather_datum` is provided it will be attached to each
         `HouseEnv` instance as `current_weather` so `HouseEnv.step` can
         optionally consume it without changing the Gym step signature.
         """
-        results: List[Any] = []
+        results: list[Any] = []
         for i, house in enumerate(self.house_environments):
             try:
                 if weather_datum is not None:
                     # attach current weather row (pd.Series-like) for consumer use
-                    setattr(house, "current_weather", weather_datum)
+                    house.current_weather = weather_datum
             except Exception:
                 # best-effort attach; don't fail the loop if assignment fails
                 pass
@@ -53,7 +54,7 @@ class HouseholdManager:
             # attach market + household rows as well (best-effort)
             try:
                 if market_datum is not None:
-                    setattr(house, "current_market", market_datum)
+                    house.current_market = market_datum
             except Exception:
                 pass
 
@@ -62,7 +63,7 @@ class HouseholdManager:
                 target = None
                 if household_datum is not None:
                     # pd.Series-like supports .get
-                    per_house_key = f"consumption_{i+1}"
+                    per_house_key = f"consumption_{i + 1}"
                     try:
                         v = household_datum.get(per_house_key, None)
                     except Exception:
@@ -79,15 +80,15 @@ class HouseholdManager:
                         if total is not None:
                             target = float(total) / max(float(self.num_households), 1.0)
 
-                setattr(house, "current_consumption_target", target)
+                house.current_consumption_target = target
             except Exception:
                 # best-effort; if it fails we just don't override base_load
                 pass
-            
+
             results.append(house.step(house_actions[i]))
         return results
 
-    def get_states(self) -> List[np.ndarray]:
+    def get_states(self) -> list[np.ndarray]:
         return [house.get_state() for house in self.house_environments]
 
     def get_grid_state(self, current_time: int, max_episode_steps: int) -> np.ndarray:
@@ -141,7 +142,7 @@ class HouseholdManager:
         return np.asarray(step_result, dtype=np.float32)
 
     @staticmethod
-    def aggregate_states(house_states: List[np.ndarray]) -> Dict[str, float]:
+    def aggregate_states(house_states: list[np.ndarray]) -> dict[str, float]:
         if not house_states:
             return {"demand": 0.0, "supply": 0.0}
 

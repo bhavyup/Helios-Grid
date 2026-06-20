@@ -24,7 +24,7 @@ that crashes downstream.
 
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # ===================================================================
 # Row-indexable DataFrame wrapper
 # ===================================================================
+
 
 class RowIndexableDataFrame:
     """
@@ -74,9 +75,10 @@ class RowIndexableDataFrame:
 # Grid topology
 # ===================================================================
 
+
 def load_grid_topology(
     file_path: str = "data/grid_topology/sample_grid.json",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Load grid topology from a JSON file.
 
@@ -137,10 +139,12 @@ def load_weather_data(
             file_path,
         )
         n_rows = 24
-        df = pd.DataFrame({
-            col: np.zeros(n_rows, dtype=np.float32)
-            for col in _DEFAULT_WEATHER_COLUMNS
-        })
+        df = pd.DataFrame(
+            {
+                col: np.zeros(n_rows, dtype=np.float32)
+                for col in _DEFAULT_WEATHER_COLUMNS
+            }
+        )
         return RowIndexableDataFrame(df)
 
     df = pd.read_csv(file_path)
@@ -150,6 +154,7 @@ def load_weather_data(
 # ===================================================================
 # Household consumption data
 # ===================================================================
+
 
 def load_household_data(
     file_path: str = "data/historical_energy_data/sample_consumption.csv",
@@ -170,9 +175,11 @@ def load_household_data(
             "Household data file not found: %s — using synthetic defaults.",
             file_path,
         )
-        df = pd.DataFrame({
-            "consumption": np.zeros(24, dtype=np.float32),
-        })
+        df = pd.DataFrame(
+            {
+                "consumption": np.zeros(24, dtype=np.float32),
+            }
+        )
         return RowIndexableDataFrame(df)
 
     df = pd.read_csv(file_path)
@@ -210,11 +217,13 @@ def load_market_data(
             file_path,
         )
         n_rows = 24
-        df = pd.DataFrame({
-            "supply": np.full(n_rows, 75.0, dtype=np.float32),
-            "demand": np.full(n_rows, 60.0, dtype=np.float32),
-            "price": np.full(n_rows, 0.3, dtype=np.float32),
-        })
+        df = pd.DataFrame(
+            {
+                "supply": np.full(n_rows, 75.0, dtype=np.float32),
+                "demand": np.full(n_rows, 60.0, dtype=np.float32),
+                "price": np.full(n_rows, 0.3, dtype=np.float32),
+            }
+        )
         return RowIndexableDataFrame(df)
 
     df = pd.read_csv(file_path)
@@ -224,6 +233,7 @@ def load_market_data(
 # ===================================================================
 # Preprocessing stubs
 # ===================================================================
+
 
 def preprocess_weather_data(weather_data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -257,7 +267,8 @@ def preprocess_market_data(market_data: pd.DataFrame) -> pd.DataFrame:
 # Path registry
 # ===================================================================
 
-def get_data_paths() -> Dict[str, str]:
+
+def get_data_paths() -> dict[str, str]:
     """
     Return canonical data file paths.
 
@@ -279,24 +290,16 @@ def get_data_paths() -> Dict[str, str]:
     try:
         # Try dict-style first (consistent with grid_env.py)
         paths = config["data_paths"]
-        return {
-            k: paths.get(k, defaults[k])
-            for k in defaults
-        }
+        return {k: paths.get(k, defaults[k]) for k in defaults}
     except (TypeError, KeyError, AttributeError):
         pass
 
     try:
         # Try attribute-style (consistent with coordinator_agent.py)
         paths = config.data_paths
-        return {
-            k: getattr(paths, k, defaults[k])
-            for k in defaults
-        }
+        return {k: getattr(paths, k, defaults[k]) for k in defaults}
     except AttributeError:
         pass
 
-    logger.warning(
-        "Could not read data_paths from config — using hardcoded defaults."
-    )
+    logger.warning("Could not read data_paths from config — using hardcoded defaults.")
     return defaults
